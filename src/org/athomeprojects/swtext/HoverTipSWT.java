@@ -46,6 +46,13 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 
 	private boolean mouse_down, timer_hint, hidden;
 
+	// GTK4 下 popover 定位与实际期望位置存在主题相关偏移(gap),显示后实测校准补偿
+	private boolean offset_calibrated;
+
+	private int offset_x, offset_y;
+
+	private Rectangle pending_bounds;
+
 	private DiagramTip tip = null;
 
 	public HoverTipSWT(Shell parent) {
@@ -117,6 +124,7 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 		shell.pack();
 		setHoverLocation(pos);
 		shell.setVisible(true);
+		calibrateOffset();
 		hidden = false;
 	}
 
@@ -133,8 +141,9 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 		Point pt = canvas.toDisplay(x, y);
 		bounds.x = pt.x;
 		bounds.y = pt.y;
-		shell.setBounds(bounds);
+		applyBounds(bounds);
 		shell.setVisible(true);
+		calibrateOffset();
 		timer_hint = true;
 		hidden = false;
 		Display.getCurrent().timerExec(second * 1000, new Runnable() {
@@ -177,7 +186,36 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 			if (shell_bounds.contains(position))
 				shell_bounds.x += 16;
 		}
-		shell.setBounds(shell_bounds);
+		applyBounds(shell_bounds);
+	}
+
+	// GTK4 下 shell 为 GtkPopover,SWT 记录的 setBounds 位置与 popover
+	// 实际显示位置之间存在主题相关 gap,这里统一补偿
+	private void applyBounds(Rectangle bounds) {
+		pending_bounds = new Rectangle(bounds.x, bounds.y, bounds.width,
+				bounds.height);
+		shell.setBounds(bounds.x + offset_x, bounds.y + offset_y, bounds.width,
+				bounds.height);
+	}
+
+	// 显示后实测 popover 真实位置,与期望位置求差得 gap 并缓存;
+	// 校准成功后立即重定位一次,使首次显示即贴切
+	private void calibrateOffset() {
+		if (!shell.isVisible() || pending_bounds == null)
+			return;
+		Point actual = shell.toDisplay(0, 0);
+		int dx = pending_bounds.x - actual.x;
+		int dy = pending_bounds.y - actual.y;
+		if (Math.abs(dx) > 50 || Math.abs(dy) > 50)
+			return; // GTK 因屏幕边缘自动调整过位置,不校准
+		if (dx == offset_x && dy == offset_y) {
+			offset_calibrated = true;
+			return;
+		}
+		offset_x = dx;
+		offset_y = dy;
+		shell.setBounds(pending_bounds.x + offset_x, pending_bounds.y
+				+ offset_y, pending_bounds.width, pending_bounds.height);
 	}
 
 	public void dispose() {

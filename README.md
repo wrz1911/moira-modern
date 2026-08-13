@@ -6,7 +6,8 @@
 ## 升级内容（相对 moira_macOS）
 
 - **JDK 11 → 21+**（需 JDK 21 或更高版本，SWT 4.39+ 的硬性要求）
-- **SWT 4.20 → 4.40**（3.134.0，2026-06 GA）
+- **SWT 4.20 → 4.40+**（Linux 本机现用 3.135.0，2026-08-12 构建，含 GTK4 popover 闪退修复；
+  2026-09 SWT 4.41 正式版发布后可换正式 jar）
 - **JFace 3.22.200 → 3.39.100**、**equinox.common 3.15.0 → 3.20.400**、**core.commands 3.10.0 → 3.12.500**
   （注意：core.commands 是 JFace 的**运行期依赖**，不可删除）
 - 删除死代码：`moiraApplet` 包（Applet API 已于 JDK 17 移除）、`awtext` 包（Swing 遗留）
@@ -16,14 +17,25 @@
 
 | 文件 | 说明 |
 |---|---|
-| `swt.jar` | SWT 3.134.0 **GTK/Linux x86_64 版**（本机运行用） |
-| `macos/swt-macos-aarch64-3.134.0.jar` | SWT 3.134.0 macOS ARM 版（macOS 交付用） |
+| `swt.jar` | SWT 3.135.0 **GTK/Linux x86_64 版**（本机运行用，内含 GTK3/GTK4 双原生库，运行时优先 GTK4） |
+| `macos/swt-macos-aarch64-3.134.0.jar` | SWT 3.134.0 macOS ARM 版（macOS 交付用，仍为 3.134；GTK 修复仅影响 Linux） |
 | `org.eclipse.jface_3.39.100.jar` | JFace |
 | `org.eclipse.equinox.common_3.20.400.jar` | equinox common |
 | `org.eclipse.core.commands_3.12.500.jar` | core.commands（JFace 运行期依赖） |
 
-SWT jar 按操作系统 + 架构分版（内含原生库），Windows 下需换用 `org.eclipse.swt.win32.win32.x86_64:3.134.0`，
+SWT jar 按操作系统 + 架构分版（内含原生库），Windows 下需换用 `org.eclipse.swt.win32.win32.x86_64`（3.134.0 及以上），
 并安装 WebView2 Runtime（Win11 基本预装）。
+
+## 数据文件（星历 / 星表 / 地磁）
+
+- **瑞士星历（`ephe/*.se1`）**：Swiss Ephemeris 官方 2026-05-26 版，格式 3（文件头 `SWISSEPH 3`），
+  新增 BCE 段，覆盖 -5400 ~ 5400 年（TestRange 实测全部通过）。600 年一段：
+  正年文件带下划线（如 `sepl_00.se1`），BCE 段无下划线（如 `seplm06.se1`，编号 = ceil(|year|/100)）。
+- **固定恒星表（`ephe/fixstars.cat`）**：与星历同源同版（含 1000+ 恒星，供 `SwissEph.getFixStar` 使用）。
+- **地磁模型（`WMM2005.COF` / `WMM2010.COF` / `WMM2025.COF`）**：WMM2025（2024-11-13 发布）已就位，
+  三个版本共存，Geomag 探测从最新年份倒序匹配，2025 优先。
+- **下载与校验**：`ephe_url` 指向 GitHub 官方源，缺文件时程序按需下载（`Calculate.java:1525 loadEphIndex`）；
+  文件经 jsDelivr CDN 获取（本机直连 GitHub raw 极慢），以 GitHub API size 与 SWISSEPH 文件头双重校验。
 
 ## 对 moira 源码的修改点
 
@@ -38,6 +50,14 @@ SWT jar 按操作系统 + 架构分版（内含原生库），Windows 下需换�
    `ChartTab.showDiagram` 与 `DrawAWT.init` 中开启
    `KEY_ANTIALIASING` / `KEY_TEXT_ANTIALIASING`，并在 `run.sh` 中加
    `-Dawt.useSystemAAFontSettings=lcd` 强制文本次像素渲染。
+5. **星盘字体改为各平台原生字体**：不再指定特定字体（如宋体），由 SWT 在
+   Linux（GTK）/ macOS / Windows 上自行解析系统字体，各平台显示均正常。
+6. **悬停解释框定位校准**（`HoverTipSWT.java`）：GTK4 下 `setBounds` 落点与请求坐标
+   存在偏差，导致提示框离鼠标过远。已加校准逻辑——首次显示后以 `toDisplay`
+   实测偏移补偿 `setBounds` 并缓存，实测提示框紧贴鼠标。
+7. **TableTab 列表尺寸估算改用 `getSize`**：GTK4 下 `getClientArea` 会触发
+   `forceResize` 反馈环，引起 resize 风暴。`getNumVisibleRow` 改用 `getSize`
+   估算，不再调用 `getClientArea`。
 
 ## 编译与运行
 
@@ -46,7 +66,17 @@ javac -encoding UTF-8 -d out -cp "lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar
 java --enable-native-access=ALL-UNNAMED -cp "out:lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar:lib/org.eclipse.equinox.common_3.20.400.jar:lib/org.eclipse.core.commands_3.12.500.jar:src" org.athomeprojects.moira.Moira
 ```
 
-Linux 运行需 GTK3 与 webkit2gtk-4.1（Browser 控件用）。
+Linux 运行需 **GTK4** 与 **webkitgtk-6.0**（Browser 控件用，SWT 按需 dlopen 探测）。
+swt.jar 3.135 同时内含 GTK3 / GTK4 原生库，运行时优先加载 GTK4；本机（CachyOS）已实测 GTK4 运行。
+
+## GTK4 兼容性验证（2026-08-13）
+
+- swt.jar 3.135.0（2026-08-12 构建）已修复 SWT 上游 GTK4 移植的两个闪退 bug（菜单 Popover
+  销毁后仍被访问、`gtk_widget_destroy` 的 use-after-free），这两个 bug 在 3.134.0 上可稳定复现崩溃。
+- 运行日志中偶发的 `Gtk-CRITICAL` 断言警告（如启动期 7 次
+  `gtk_tree_view_scroll_to_cell: 'tree_view->priv->tree != NULL'`）为 SWT 上游 GTK4 移植遗留：
+  失败仅打印并安全返回，不影响功能；实测正常操作全程无断言。
+- 建议 2026-09 SWT 4.41 正式版发布后升级 lib/swt.jar，届时上述上游遗留应已修复。
 
 ## 运行调试截图
 

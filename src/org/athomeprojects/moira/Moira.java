@@ -30,6 +30,8 @@ import org.athomeprojects.swtext.ImageManager;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabFolder;
 import org.eclipse.swt.custom.StackLayout;
+import org.eclipse.swt.dnd.Clipboard;
+import org.eclipse.swt.dnd.TextTransfer;
 import org.eclipse.swt.events.KeyAdapter;
 import org.eclipse.swt.events.KeyEvent;
 import org.eclipse.swt.events.MouseEvent;
@@ -485,7 +487,13 @@ public class Moira {
 				Resource.putPrefInt("tray_icon", 0);
 				return false;
 			}
-			tray_item = new TrayItem(tray, SWT.NONE);
+			try {
+				tray_item = new TrayItem(tray, SWT.NONE);
+			} catch (Throwable e) {
+				// GTK4 后端无托盘支持(gtk_status_icon 已移除),降级为不显示托盘图标
+				Resource.putPrefInt("tray_icon", 0);
+				return false;
+			}
 			tray_item.addListener(SWT.Selection, new Listener() {
 				public void handleEvent(Event event) {
 					if (shell.getVisible()) {
@@ -765,9 +773,15 @@ public class Moira {
 	}
 
 	static public String fromClipboard() {
-		transfer.selectAll();
-		transfer.paste();
-		return transfer.getText();
+		// GTK4 后端 Text.paste 有缺陷(SWT 4.40),改用 SWT Clipboard 类直接读文本
+		Clipboard clipboard = new Clipboard(display);
+		try {
+			String data = (String) clipboard
+					.getContents(TextTransfer.getInstance());
+			return data == null ? "" : data;
+		} finally {
+			clipboard.dispose();
+		}
 	}
 
 	static public void main(String[] args) {

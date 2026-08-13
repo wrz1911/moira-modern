@@ -51,17 +51,27 @@ public class FontMap {
 	static private String mapSwtFontName(String name) {
 		if (font_data_array == null)
 			font_data_array = Display.getCurrent().getFontList(null, true);
-		String[] name_array = Resource.getPossibleFontName(name);
-		if (name_array == null || font_data_array == null)
+		if (font_data_array == null)
 			return name;
-		for (int i = 0; i < font_data_array.length; i++) {
-			String f_name = font_data_array[i].getName();
-	
-			for (int j = 0; j < name_array.length; j++) {
-				if (f_name.equalsIgnoreCase(name_array[j]))
-					return f_name;
+		String[] name_array = Resource.getPossibleFontName(name);
+		if (name_array != null) {
+			for (int i = 0; i < font_data_array.length; i++) {
+				String f_name = font_data_array[i].getName();
+
+				for (int j = 0; j < name_array.length; j++) {
+					if (f_name.equalsIgnoreCase(name_array[j]))
+						return f_name;
+				}
 			}
 		}
-		return null;
+		// 兜底 1:字体对话框存入的可能是 GTK 本地化名(如「苹方-简」),直接按原名字匹配
+		if (name != null) {
+			for (int i = 0; i < font_data_array.length; i++) {
+				if (name.equalsIgnoreCase(font_data_array[i].getName()))
+					return name;
+			}
+		}
+		// 兜底 2:原样返回让 SWT 自行回退,绝不返回 null(否则 new Font(null) 崩溃)
+		return name;
 	}
 }

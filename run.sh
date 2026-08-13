@@ -12,4 +12,4 @@ if [ ! -d out ] || [ -z "$(find out -name '*.class' | head -1)" ]; then
     echo "编译完成"
 fi
 
-exec java --enable-native-access=ALL-UNNAMED -Dawt.useSystemAAFontSettings=lcd -cp "$CP" org.athomeprojects.moira.Moira "$@"
+exec java --enable-native-access=ALL-UNNAMED -Dorg.eclipse.swt.internal.gtk.cssFile=moira-gtk.css -cp "$CP" org.athomeprojects.moira.Moira "$@"

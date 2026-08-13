@@ -460,6 +460,8 @@ public class DrawAWT {
 		// 开启抗锯齿,避免 Linux 上文字与线条出现锯齿
 		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 				RenderingHints.VALUE_ANTIALIAS_ON);
+		// 文字用灰度抗锯齿:LCD 亚像素渲染在旋转文字/子像素排列不匹配的屏幕上
+		// 会产生彩色重影,中文笔画复杂时尤其明显
 		g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
 				RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 		initColor();

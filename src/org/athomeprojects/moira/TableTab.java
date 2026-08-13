@@ -150,6 +150,10 @@ class TableTab {
 
     private boolean name_up, place_up, birthday_up, has_both_set, need_save;
 
+    private boolean resize_in_progress, resize_pending;
+
+    private Point last_table_size;
+
     private String[][] column_label;
 
     private int[][] column_align;
@@ -231,8 +235,24 @@ class TableTab {
         table.addControlListener(new ControlAdapter() {
             public void controlResized(ControlEvent event)
             {
-                setButtonEditors(true);
-                update();
+                // GTK4 下异步尺寸分配会反复发送 resize 事件,尺寸未变时跳过;
+                // 且 getClientArea 会触发 forceResize→layout→setBounds 同步
+                // 重入,须防重入避免栈溢出
+                Point size = table.getSize();
+                if (size.equals(last_table_size))
+                    return;
+                last_table_size = size;
+                if (resize_in_progress) {
+                    resize_pending = true;
+                    return;
+                }
+                resize_in_progress = true;
+                do {
+                    resize_pending = false;
+                    setButtonEditors(true);
+                    update();
+                } while (resize_pending);
+                resize_in_progress = false;
             }
         });
         place_container = new Composite(table, SWT.NONE);
@@ -855,7 +875,9 @@ class TableTab {
 
     private int getNumVisibleRow()
     {
-        int height = table.getClientArea().height - table.getHeaderHeight();
+        // GTK4/Wayland 下 getClientArea 会触发 forceResize,与 resize 事件
+        // 形成反馈环,这里改用 getSize 估算(无滚动条,仅差边框高度)
+        int height = table.getSize().y - table.getHeaderHeight();
         if (height <= 0)
             return 0;
         int item_height = table.getItemHeight();

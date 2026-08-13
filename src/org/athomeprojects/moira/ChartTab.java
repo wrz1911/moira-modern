@@ -1038,6 +1038,11 @@ class ChartTab {
     private void showData(GC gc, ScrolledComposite desc_scroll, Canvas canvas,
             boolean use_birth)
     {
+        // 先清空背景:ScrolledComposite 内 Canvas 重绘(尤其选项卡切换后)
+        // 若不清屏,旧画面与新画面会叠加成重影
+        Rectangle client_area = canvas.getClientArea();
+        gc.setBackground(canvas.getBackground());
+        gc.fillRectangle(client_area);
         boolean show_horiz = data.getShowHoriz();
         if (show_horiz || ChartMode.isChartMode(ChartMode.ASTRO_MODE)) {
             if (!use_birth)
@@ -1144,21 +1149,32 @@ class ChartTab {
         Resource.getIntArray("swt_font_size", font_size);
         Resource.getIntArray("swt_" + type + "_data_size", data_size);
         FontMetrics metric;
+        int chosen = font_size[0];
         for (int size = font_size[1]; size >= font_size[0]; size -= font_size[2]) {
-            if (font != null)
-                font.dispose();
-            font = new Font(Display.getCurrent(), FontMap.getSwtFontName(),
-                    size, MenuFolder.getSwtFontStyle());
-            gc.setFont(font);
+            Font test_font = new Font(Display.getCurrent(), FontMap
+                    .getSwtFontName(), size, MenuFolder.getSwtFontStyle());
+            gc.setFont(test_font);
             metric = gc.getFontMetrics();
             int font_height = metric.getHeight();
             int font_width = font_height;
             int max_height = data_size[0] * font_height;
             int max_width = (int) (DESC_WIDTH_SCALER * data_size[1] * font_width);
+            test_font.dispose();
             if ((int) (DESC_DATA_SCALER * max_width) <= s_size.x
-                    && (int) (DESC_DATA_SCALER * max_height) <= s_size.y)
+                    && (int) (DESC_DATA_SCALER * max_height) <= s_size.y) {
+                chosen = size;
                 break;
+            }
         }
+        // 仅在字号改变时才重建缓存字体:paint 期间释放正在被 gc 使用的字体,
+        // 在 GTK3 下会令后续 drawString 渲染错乱,产生叠影/重影
+        if (font == null || font.getFontData()[0].getHeight() != chosen) {
+            if (font != null)
+                font.dispose();
+            font = new Font(Display.getCurrent(), FontMap.getSwtFontName(),
+                    chosen, MenuFolder.getSwtFontStyle());
+        }
+        gc.setFont(font);
     }
 
     public void reset()

@@ -1,0 +1,14 @@
+/* Moira 自定义 GTK CSS(经 -Dorg.eclipse.swt.internal.gtk.cssFile 注入)
+ * 修复:深色 GTK 主题下 tooltip 文字不可见(黄底白字/空框)
+ * 强制 tooltip 为黄底黑字,保证各主题下提示文字清晰可读 */
+tooltip.background {
+    background-color: #ffffe0;
+    background-image: none;
+    border: 1px solid #b8a050;
+}
+tooltip label {
+    color: #000000;
+}
+tooltip * {
+    color: #000000;
+}
