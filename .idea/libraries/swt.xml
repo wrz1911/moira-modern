@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="swt">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/swt.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/org.eclipse.jface_3.39.100.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/org.eclipse.equinox.common_3.20.400.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/org.eclipse.core.commands_3.12.500.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

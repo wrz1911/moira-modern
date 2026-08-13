@@ -1,0 +1,4 @@
+out/
+.claude/
+*.log
+.idea/workspace.xml
