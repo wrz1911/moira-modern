@@ -40,7 +40,7 @@ public class ImageControl {
 	static public String[] IMAGE_EXTENSIONS = { "*.png", "*.jpg", "*.svg" };
 
 	static public int getSelectionFromSize(int[] size) {
-		if(true) return MEDIUM_SIZE;
+		// 按实际盘面尺寸匹配预设档位(大/中/小),供保存对话框默认选择
 		int[] large_size = Resource.getIntArray("image_size_large");
 		int[] medium_size = Resource.getIntArray("image_size_medium");
 		int[] small_size = Resource.getIntArray("image_size_small");
