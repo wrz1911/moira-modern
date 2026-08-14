@@ -94,24 +94,4 @@ final class Gtk4SurfacePos {
 		return new int[] { w, h };
 	}
 
-	// 临时诊断:分步打印 origin 读取链路,定位失败环节
-	static void diag(long popoverHandle) {
-		try {
-			long nativePtr = popoverHandle == 0 ? 0
-					: GTK4.gtk_widget_get_native(popoverHandle);
-			long surf = nativePtr == 0 ? 0
-					: GTK4.gtk_native_get_surface(nativePtr);
-			System.err.println("[diag] popover="
-					+ Long.toHexString(popoverHandle) + " native="
-					+ Long.toHexString(nativePtr) + " surf="
-					+ Long.toHexString(surf));
-			if (surf == 0)
-				return;
-			int x = (int) GDK_POPUP_GET_POSITION_X.invoke(seg(surf));
-			int y = (int) GDK_POPUP_GET_POSITION_Y.invoke(seg(surf));
-			System.err.println("[diag] popup position=(" + x + "," + y + ")");
-		} catch (Throwable t) {
-			System.err.println("[diag] 异常: " + t);
-		}
-	}
 }

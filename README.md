@@ -22,6 +22,7 @@
 | `org.eclipse.jface_3.39.100.jar` | JFace |
 | `org.eclipse.equinox.common_3.20.400.jar` | equinox common |
 | `org.eclipse.core.commands_3.12.500.jar` | core.commands（JFace 运行期依赖） |
+| `jfreesvg-3.4.4.jar` | JFreeSVG 3.4.4（BSD），星盘「保存图片」新增 **SVG 矢量导出**（复用 pageDiagram 绘制管线，`ImageControl.captureSVG`） |
 
 SWT jar 按操作系统 + 架构分版（内含原生库），Windows 下需换用 `org.eclipse.swt.win32.win32.x86_64`（3.134.0 及以上），
 并安装 WebView2 Runtime（Win11 基本预装）。
@@ -52,9 +53,11 @@ SWT jar 按操作系统 + 架构分版（内含原生库），Windows 下需换�
    `-Dawt.useSystemAAFontSettings=lcd` 强制文本次像素渲染。
 5. **星盘字体改为各平台原生字体**：不再指定特定字体（如宋体），由 SWT 在
    Linux（GTK）/ macOS / Windows 上自行解析系统字体，各平台显示均正常。
-6. **悬停解释框定位校准**（`HoverTipSWT.java`）：GTK4 下 `setBounds` 落点与请求坐标
-   存在偏差，导致提示框离鼠标过远。已加校准逻辑——首次显示后以 `toDisplay`
-   实测偏移补偿 `setBounds` 并缓存，实测提示框紧贴鼠标。
+6. **悬停解释框定位校准**（`HoverTipSWT.java`）：GTK4 下 ON_TOP shell 是 GtkPopover，
+   SWT 的 `toDisplay` 返回记录值无法实测真实落点。修复：`positionPopover` 用 height=0
+   的 pointing rect 让 GTK 自动定位；显示后经 FFM 直调 `gdk_popup_get_position_x/y`
+   （`Gtk4SurfacePos.java`）读 popover surface 真实 origin，与期望位置求差得 gap 并
+   累加补偿（只校准一次，offset 下次显示生效），实测弹窗紧贴指针 +16px。
 7. **TableTab 列表尺寸估算改用 `getSize`**：GTK4 下 `getClientArea` 会触发
    `forceResize` 反馈环，引起 resize 风暴。`getNumVisibleRow` 改用 `getSize`
    估算，不再调用 `getClientArea`。

@@ -38,10 +38,6 @@ import org.eclipse.swt.widgets.Shell;
 
 public class HoverTipSWT implements MouseListener, MouseMoveListener,
 		MouseTrackListener {
-	// 临时诊断:毫秒时间戳尾数,用于与截屏时间线对齐定位 popover 真实落点
-	private static String ts() {
-		return Long.toString(System.currentTimeMillis() % 100000);
-	}
 	// 是否运行在 GTK4 下(SWT 3.135 起 GTK4 为可选后端,由 SWT_GTK4=1 启用)
 	// GTK4 下 ON_TOP shell 是 GtkPopover,其 pointing_to 矩形以主窗口 vbox
 	// 坐标系解释;GTK3 下是顶层窗口,setBounds 用屏幕坐标
@@ -94,8 +90,6 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 			f.setAccessible(true);
 			popover_handle = f.getLong(shell);
 		} catch (Throwable t) {
-			System.err.println("[" + ts() + "][HoverTip] shellHandle 反射失败: "
-					+ t);
 		}
 		return popover_handle;
 	}
@@ -146,8 +140,6 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 	public void hide() {
 		if (!hidden && !timer_hint && shell != null && !shell.isDisposed()
 				&& shell.isVisible()) {
-			System.err.println("[" + ts() + "][HoverTip] hide from "
-					+ Thread.currentThread().getStackTrace()[2].getMethodName());
 			shell.setVisible(false);
 			shell.update();
 			hidden = true;
@@ -175,33 +167,23 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 		// 首发由「首个忽略」吃掉,二发按「与上一发同坐标」拦截;
 		// 真实移动坐标逐发变化,不受影响
 		if (shown_time != 0 && System.nanoTime() - shown_time < 200_000_000L) {
-			System.err.println("[" + ts() + "][HoverTip] mouseMove popup 短窗拦截 ("
-					+ event.x + "," + event.y + ")");
 			return;
 		}
 		if (shown_pos != null && !first_motion_seen) {
 			first_motion_seen = true;
 			last_motion_pos = new Point(event.x, event.y);
 			last_motion_time = System.nanoTime();
-			System.err.println("[" + ts() + "][HoverTip] mouseMove 首个忽略 ("
-					+ event.x + "," + event.y + ")");
 			return;
 		}
 		if (shown_pos != null && last_motion_pos != null
 				&& event.x == last_motion_pos.x && event.y == last_motion_pos.y
 				&& System.nanoTime() - last_motion_time < 600_000_000L) {
-			System.err.println("[" + ts() + "][HoverTip] mouseMove 拦截:同坐标重复发 ("
-					+ event.x + "," + event.y + ")");
 			return;
 		}
 		if (shown_pos != null && Math.abs(event.x - shown_pos.x) <= 1
 				&& Math.abs(event.y - shown_pos.y) <= 1) {
-			System.err.println("[" + ts() + "][HoverTip] mouseMove 拦截:坐标未变 ("
-					+ event.x + "," + event.y + ")");
 			return;
 		}
-		System.err.println("[" + ts() + "][HoverTip] mouseMove hide 坐标=("
-				+ event.x + "," + event.y + ") shown_pos=" + shown_pos);
 		hide();
 	}
 
@@ -221,8 +203,6 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 		if (!hidden && shell.isVisible() && shown_pos != null
 				&& Math.abs(cur.x - shown_pos.x) <= 1
 				&& Math.abs(cur.y - shown_pos.y) <= 1) {
-			System.err.println("[" + ts() + "][HoverTip] mouseHover 跳过:同位置重复 ("
-					+ cur.x + "," + cur.y + ")");
 			return;
 		}
 		// 坐标域修复:实测 GTK4 下 mouseHover 的 event 坐标是 surface(display)
@@ -233,17 +213,9 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 		// 即「弹窗距鼠标太远」的根因。修复:内容判定用控件坐标、弹窗定位用
 		// surface 坐标,且全部取自实时光标位置而非事件坐标。
 		String str = tip.getTipFromPoint(real.x, real.y);
-		System.err.println("[" + ts() + "][HoverTip] 内容诊断 event=(" + event.x
-				+ "," + event.y + ") 实时光标=(" + cur.x + "," + cur.y
-				+ ") 控件坐标=(" + real.x + "," + real.y
-				+ ") tip=" + (str == null ? "null"
-						: str.substring(0, Math.min(30, str.length())).replace('\n', '|')));
-		tip.dumpRegion(real.x, real.y);
 		if (str == null) {
 			// 光标在无提示区域:若旧弹窗还显示着,隐藏它,避免内容与位置错配
 			if (!hidden && shell.isVisible()) {
-				System.err.println("[" + ts() + "][HoverTip] 空白处 hide ("
-						+ cur.x + "," + cur.y + ")");
 				hide();
 			}
 			return;
@@ -259,29 +231,6 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 		shown_pos = new Point(cur.x, cur.y); // 记录实时光标位置(与 mouseMove event 同域)
 		first_motion_seen = false;
 		last_motion_pos = null;
-		System.err.println("[" + ts() + "][HoverTip] mouseHover 显示 pos=" + pos
-				+ " shell=" + shell.getBounds());
-		// 切文字诊断:popup 动画(~200ms)结束后读 popover 真实分配尺寸,
-		// 与 shell 期望尺寸对比,判断是否被主窗口 client 区截断
-		shell.getDisplay().timerExec(300, new Runnable() {
-			public void run() {
-				try {
-					if (!GTK4 || shell.isDisposed() || !shell.isVisible())
-						return;
-					int[] s = Gtk4SurfacePos.size(popoverHandle());
-					Rectangle b = shell.getBounds();
-					int[] o = Gtk4SurfacePos.origin(popoverHandle());
-					System.err.println("[" + ts() + "][HoverTip] 显示诊断 期望=("
-							+ b.x + "," + b.y + ") 真实origin="
-							+ (o == null ? "null" : "(" + o[0] + "," + o[1] + ")")
-							+ " 尺寸 GTK真实="
-							+ (s == null ? "null" : "(" + s[0] + "," + s[1] + ")")
-							+ " shell=(" + b.width + "," + b.height + ")");
-				} catch (Throwable t) {
-					System.err.println("[" + ts() + "][HoverTip] 尺寸诊断异常: " + t);
-				}
-			}
-		});
 	}
 
 	public void showTimerHint(String mesg, Canvas canvas, int x, int y,
@@ -321,7 +270,6 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 	public void mouseEnter(MouseEvent event) {
 		shown_pos = null;
 		last_motion_pos = null;
-		System.err.println("[" + ts() + "][HoverTip] mouseEnter");
 	}
 
 	public void mouseExit(MouseEvent event) {
@@ -332,11 +280,8 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 			return;
 		Point p = ctrl.getDisplay().getCursorLocation();
 		if (ctrl.getBounds().contains(ctrl.toControl(p))) {
-			System.err.println("[" + ts() + "][HoverTip] mouseExit 拦截:指针仍在控件内 "
-					+ p + " ctrl=" + ctrl.getBounds());
 			return;
 		}
-		System.err.println("[" + ts() + "][HoverTip] mouseExit 真离开 " + p);
 		hide();
 	}
 
@@ -403,8 +348,6 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 			offset_x += dx;
 			offset_y += dy;
 			offset_calibrated = true;
-			System.err.println("[" + ts() + "][HoverTip] 校准 dx=" + dx + " dy=" + dy
-					+ " offset=(" + offset_x + "," + offset_y + ")");
 			return;
 		}
 		// GTK4:shell 是 GtkPopover,SWT 的 toDisplay 返回记录值无法实测;
@@ -415,7 +358,6 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 				try {
 					calibrateGTK4();
 				} catch (Throwable t) {
-					System.err.println("[" + ts() + "][HoverTip] 校准异常: " + t);
 				}
 			}
 
@@ -424,23 +366,13 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 						|| !shell.isVisible() || pending_bounds == null)
 					return;
 				int[] o = Gtk4SurfacePos.origin(popoverHandle());
-				if (o == null) {
-					System.err.println("[" + ts() + "][HoverTip] 校准:origin 读取失败");
-					Gtk4SurfacePos.diag(popoverHandle());
+				if (o == null)
 					return;
-				}
 				// pending_bounds 是 surface 坐标,与真实 origin 同域,直接求差
 				int dx = pending_bounds.x - o[0];
 				int dy = pending_bounds.y - o[1];
-				System.err.println("[" + ts() + "][HoverTip] 校准 真实origin=(" + o[0]
-						+ "," + o[1] + ") 期望=(" + pending_bounds.x
-						+ "," + pending_bounds.y + ") gap=(" + dx + ","
-						+ dy + ")");
-				if (Math.abs(dx) > 50 || Math.abs(dy) > 50) {
-					System.err.println("[" + ts()
-							+ "][HoverTip] 校准:gap 过大(GTK 自动调整),不补偿");
+				if (Math.abs(dx) > 50 || Math.abs(dy) > 50)
 					return;
-				}
 				offset_x += dx;
 				offset_y += dy;
 				offset_calibrated = true;
