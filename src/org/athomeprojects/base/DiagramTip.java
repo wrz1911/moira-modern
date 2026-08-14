@@ -49,7 +49,7 @@ public class DiagramTip {
 
 	private Entry last_entry, next_tip = new Entry();
 
-	private LinkedList region, planet;
+	private LinkedList<Entry> region, planet;
 
 	private class Entry {
 		int planet_no;
@@ -71,8 +71,8 @@ public class DiagramTip {
 	}
 
 	public void reset() {
-		region = new LinkedList();
-		planet = new LinkedList();
+		region = new LinkedList<Entry>();
+		planet = new LinkedList<Entry>();
 		clearNextTip();
 		enabled = need_update = true;
 	}
@@ -85,7 +85,7 @@ public class DiagramTip {
 		center_y = size[1];
 		radius = size[2];
 		scaler = 1.0;
-		region = new LinkedList();
+		region = new LinkedList<Entry>();
 		clearNextTip();
 	}
 
@@ -297,8 +297,9 @@ public class DiagramTip {
 		double radian = Math.atan2(-d_y, d_x);
 		radian = boundRadian(radian);
 		last_entry = null;
-		for (ListIterator iter = region.listIterator(); iter.hasNext();) {
-			Entry entry = (Entry) iter.next();
+		for (ListIterator<Entry> iter = region.listIterator(); iter
+				.hasNext();) {
+			Entry entry = iter.next();
 			if (entry.rectangle)
 				continue;
 			if (radius2 >= entry.l_radius2 && radius2 < entry.u_radius2
@@ -323,8 +324,9 @@ public class DiagramTip {
 			return (last_entry != null && radius2 >= last_entry.l_radius2 && radius2 < last_entry.u_radius2) ? (radian * RADIAN)
 					: INVALID_DOUBLE;
 		}
-		for (ListIterator iter = region.listIterator(); iter.hasNext();) {
-			Entry entry = (Entry) iter.next();
+		for (ListIterator<Entry> iter = region.listIterator(); iter
+				.hasNext();) {
+			Entry entry = iter.next();
 			if (entry.rectangle)
 				continue;
 			if (radius2 >= entry.l_radius2 && radius2 < entry.u_radius2
@@ -342,8 +344,9 @@ public class DiagramTip {
 		double radius2 = d_x * d_x + d_y * d_y;
 		double radian = Math.atan2(-d_y, d_x);
 		radian = boundRadian(radian);
-		for (ListIterator iter = region.listIterator(); iter.hasNext();) {
-			Entry entry = (Entry) iter.next();
+		for (ListIterator<Entry> iter = region.listIterator(); iter
+				.hasNext();) {
+			Entry entry = iter.next();
 			if (entry.rectangle)
 				continue;
 			if (radius2 >= entry.l_radius2 && radius2 < entry.u_radius2
@@ -386,8 +389,9 @@ public class DiagramTip {
 		double radius2 = d_x * d_x + d_y * d_y;
 		double radian = Math.atan2(-d_y, d_x);
 		radian = boundRadian(radian);
-		for (ListIterator iter = region.listIterator(); iter.hasNext();) {
-			Entry entry = (Entry) iter.next();
+		for (ListIterator<Entry> iter = region.listIterator(); iter
+				.hasNext();) {
+			Entry entry = iter.next();
 			if (entry.rectangle) {
 				if (d_x >= entry.l_radian && d_y >= entry.u_radian
 						&& d_x <= entry.l_radius2 && d_y <= entry.u_radius2) {
@@ -416,8 +420,9 @@ public class DiagramTip {
 	}
 
 	private Entry getTipEntry(int planet_no, boolean birth_data) {
-		for (ListIterator iter = planet.listIterator(); iter.hasNext();) {
-			Entry entry = (Entry) iter.next();
+		for (ListIterator<Entry> iter = planet.listIterator(); iter
+				.hasNext();) {
+			Entry entry = iter.next();
 			if (planet_no == entry.planet_no && birth_data == entry.birth_data)
 				return entry;
 		}
