@@ -17,7 +17,7 @@
 
 | 文件 | 说明 |
 |---|---|
-| `swt.jar` | SWT 3.135.0 **GTK/Linux x86_64 版**（本机运行用，内含 GTK3/GTK4 双原生库，运行时优先 GTK4） |
+| `swt.jar` | SWT 3.135.0 **GTK/Linux x86_64 版**（本机运行用，内含 GTK3/GTK4 双原生库，设 `SWT_GTK4=1` 后优先 GTK4，否则默认 GTK3） |
 | `macos/swt-macos-aarch64-3.134.0.jar` | SWT 3.134.0 macOS ARM 版（macOS 交付用，仍为 3.134；GTK 修复仅影响 Linux） |
 | `org.eclipse.jface_3.39.100.jar` | JFace |
 | `org.eclipse.equinox.common_3.20.400.jar` | equinox common |
@@ -63,11 +63,13 @@ SWT jar 按操作系统 + 架构分版（内含原生库），Windows 下需换�
 
 ```bash
 javac -encoding UTF-8 -d out -cp "lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar:lib/org.eclipse.equinox.common_3.20.400.jar:lib/org.eclipse.core.commands_3.12.500.jar" $(find src -name '*.java')
-java --enable-native-access=ALL-UNNAMED -cp "out:lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar:lib/org.eclipse.equinox.common_3.20.400.jar:lib/org.eclipse.core.commands_3.12.500.jar:src" org.athomeprojects.moira.Moira
+SWT_GTK4=1 java --enable-native-access=ALL-UNNAMED -Dorg.eclipse.swt.internal.gtk.cssFile=moira-gtk.css -cp "out:lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar:lib/org.eclipse.equinox.common_3.20.400.jar:lib/org.eclipse.core.commands_3.12.500.jar:src" org.athomeprojects.moira.Moira
 ```
 
-Linux 运行需 **GTK4** 与 **webkitgtk-6.0**（Browser 控件用，SWT 按需 dlopen 探测）。
-swt.jar 3.135 同时内含 GTK3 / GTK4 原生库，运行时优先加载 GTK4；本机（CachyOS）已实测 GTK4 运行。
+Linux 系统依赖（Arch / CachyOS 包名）：**gtk4** 与 **webkitgtk-6.0**（Browser 控件用，SWT 按需 dlopen 探测）。
+GTK 版本由环境变量 `SWT_GTK4` 控制：swt.jar 3.135 同时内含 GTK3 / GTK4 原生库，SWT **默认加载 GTK3（pi3）**；
+设 `SWT_GTK4=1`（run.sh 已内置）则优先加载 GTK4（pi4），GTK4 加载失败自动回退 GTK3。
+本机（CachyOS）已实测 GTK4 运行（/proc/PID/maps 确认加载 libgtk-4.so.1）。
 
 ## GTK4 兼容性验证（2026-08-13）
 

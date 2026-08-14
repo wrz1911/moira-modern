@@ -1711,7 +1711,14 @@ public class ChartData {
                                 + (String) birth_table.get(year_signs[i]);
                         double angle = draw.getAngle();
                         double delta = 2 * Math.PI / 24;
-                        tip.addTip(pos, upper_pos, angle - delta,
+                        // extend the inner radius to the adjacent inner ring
+                        // so hovering the inner half of the sign text (which
+                        // overlaps the [84,107) abbreviation ring) still
+                        // shows the sign tip
+                        int tip_pos = pos;
+                        if (mark >= 1)
+                            tip_pos = (int) (ring_pos[mark - 1] * radius + 0.5);
+                        tip.addTip(tip_pos, upper_pos, angle - delta,
                                 angle + delta, false, 0, sign_tip);
                     }
                     draw.setColor();

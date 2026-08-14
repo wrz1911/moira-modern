@@ -415,6 +415,46 @@ public class DiagramTip {
 		return null;
 	}
 
+	public void dumpRegion(int x, int y) {
+		double d_x = scaler * (x - center_x);
+		double d_y = scaler * (y - center_y);
+		double radius2 = d_x * d_x + d_y * d_y;
+		double radian = boundRadian(Math.atan2(-d_y, d_x));
+		System.out.println("[DiagramTip] center=(" + center_x + "," + center_y
+				+ ") radius=" + radius + " scaler=" + scaler + " point r="
+				+ (int) Math.sqrt(radius2) + " deg="
+				+ (int) (radian * RADIAN) + " entries=" + region.size());
+		for (ListIterator iter = region.listIterator(); iter.hasNext();) {
+			Entry entry = (Entry) iter.next();
+			boolean match = entry.rectangle ? (d_x >= entry.l_radian
+					&& d_y >= entry.u_radian && d_x <= entry.l_radius2
+					&& d_y <= entry.u_radius2)
+					: (radius2 >= entry.l_radius2
+							&& radius2 < entry.u_radius2
+							&& radian >= entry.l_radian
+							&& radian < entry.u_radian);
+			if (!match)
+				continue;
+			String entry_tip = (entry.tip == null) ? "null" : entry.tip;
+			if (entry_tip.length() > 40)
+				entry_tip = entry_tip.substring(0, 40);
+			if (entry.rectangle) {
+				System.out.println("[DiagramTip] hit rect x=["
+						+ (int) entry.l_radian + ","
+						+ (int) entry.l_radius2 + "] y=["
+						+ (int) entry.u_radian + ","
+						+ (int) entry.u_radius2 + "] tip=" + entry_tip);
+			} else {
+				System.out.println("[DiagramTip] hit r=["
+						+ (int) Math.sqrt(entry.l_radius2) + ","
+						+ (int) Math.sqrt(entry.u_radius2) + ") deg=["
+						+ (int) (entry.l_radian * RADIAN) + ","
+						+ (int) (entry.u_radian * RADIAN) + ") tip="
+						+ entry_tip);
+			}
+		}
+	}
+
 	private Entry getTipEntry(int planet_no, boolean birth_data) {
 		for (ListIterator iter = planet.listIterator(); iter.hasNext();) {
 			Entry entry = (Entry) iter.next();
