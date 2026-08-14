@@ -1,4 +1,3 @@
 out/
-.claude/
-*.log
+test_out/
 .idea/workspace.xml
