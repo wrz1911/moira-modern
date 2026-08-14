@@ -61,6 +61,9 @@ jobs:
           Categories=Education;Science;
           DESK
           cp "$DIST/usr/share/applications/moira.desktop" "$DIST/moira.desktop"
+          # 图标:splash.png 为原版启动画面,直接用作应用图标
+          cp splash.png "$DIST/moira.png"
+          cp splash.png "$DIST/usr/share/icons/moira.png"
 
       - name: 打包 AppImage
         run: |
