@@ -862,8 +862,12 @@ public class DrawAWT {
 	}
 
 	private int getMaxAdvance(FontMetrics metric) {
-		// may return negative value in jre 1.6.0_05 (bug???)
-		return Math.abs(metric.getMaxAdvance());
+		// 混合字体(如 Noto Sans CJK SC)的 getMaxAdvance 会取到字体中
+		// 最宽 glyph 的 advance(实测 60,是 CJK 全角宽 20 的 3 倍),
+		// 用它做对齐宽度会让表格类文字整体错位(保存 PNG 时右上/右下
+		// 「顺逆」列表位置错误的根因);改用 CJK 全角字符宽度做基准
+		int w = metric.stringWidth("\u706B");
+		return (w > 0) ? w : Math.abs(metric.getMaxAdvance());
 	}
 
 	// dir: 1 => upper, -1 => lower, 0 => full
