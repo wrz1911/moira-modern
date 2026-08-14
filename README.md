@@ -3,6 +3,17 @@
 七政四余排盘软件 Moira 的现代化升级版，基于 [moira_macOS](https://github.com/xdhuangsidi/moira_macOS) 升级而来。
 使用 IntelliJ IDEA 打开即可运行调试（Linux / macOS / Windows 均可）。
 
+## 原作者与项目沿革
+
+**Moira 原作者：林国清**，2004 年起开发 Moira 免费排盘程序，专为七政四余（果老星宗）推演设计，
+持续更新至 2015 年左右；**原工程文件已丢失**。本工程来源于后来流传的 macOS 工程
+（[moira_macOS](https://github.com/xdhuangsidi/moira_macOS)）。
+
+平台沿革：最初仅 **Windows** → 后来 **macOS** → 现在（本工程）首次移植 **Linux**。
+本项目自始至终未在 Linux 上调试过，原代码按 Windows/macOS 控件行为编写；
+本仓库包含的 GTK/Linux 平台适配修复均属首次移植工作。
+谨此向前辈致敬，其毕生心血让七政四余（果老星宗）的推演得以在计算机上延续。
+
 ## 升级内容（相对 moira_macOS）
 
 - **JDK 11 → 21+**（需 JDK 21 或更高版本，SWT 4.39+ 的硬性要求）
