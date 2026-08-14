@@ -34,15 +34,15 @@ jobs:
           APP=Moira
           DIST=dist/AppDir
           mkdir -p "$DIST/usr/bin" "$DIST/usr/share/applications"
-          # jlink 精简 JRE(SWT/AWT/prefs 所需模块)
+          # jlink 精简 JRE(SWT/AWT/prefs 所需模块);启动脚本按 usr/runtime 路径查找
           jlink --add-modules java.base,java.desktop,java.prefs,java.logging \
               --strip-debug --no-man-pages --no-header-files \
-              --output "$DIST/runtime"
+              --output "$DIST/usr/runtime"
           mkdir -p "$DIST/usr/lib/moira"
           cp -r out lib src "$DIST/usr/lib/moira/"
           cp -r ephe example help icon moira_s.prop moira_t.prop cities.prop \
               moira-gtk.css GPL_license.txt LGPL_license.txt SEPL_license.txt \
-              readme.html "$DIST/usr/lib/moira/"
+              readme.html moira.ico splash.png WMM*.COF "$DIST/usr/lib/moira/"
           cat > "$DIST/usr/bin/moira" << 'LAUNCH'
           #!/usr/bin/env bash
           HERE="$(dirname "$(readlink -f "$0")")"
@@ -54,6 +54,8 @@ jobs:
               org.athomeprojects.moira.Moira "$@"
           LAUNCH
           chmod +x "$DIST/usr/bin/moira"
+          # AppImage 入口:AppDir 根必须存在 AppRun(链接到 usr/bin/moira)
+          ln -s usr/bin/moira "$DIST/AppRun"
           cat > "$DIST/usr/share/applications/moira.desktop" << 'DESK'
           [Desktop Entry]
           Name=Moira
@@ -73,21 +75,25 @@ jobs:
           curl -sL -o "$TOOL" \
               "https://github.com/AppImage/appimagetool/releases/download/continuous/$TOOL"
           chmod +x "$TOOL"
-          VERSION=$(grep -o 'Version [0-9.]*' readme.html | head -1 | awk '{print $2}')
+          # 产物版本号用 Release 版本(tag 名去 v 前缀,如 v1.0.0 → 1.0.0)
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" = "main" ] || [ "$VERSION" = "master" ]; then
+            VERSION=$(grep -o 'Version [0-9.]*' readme.html | head -1 | awk '{print $2}')
+          fi
           ARCH=x86_64 "./$TOOL" dist/AppDir \
-              "dist/Moira-${VERSION}-x86_64.AppImage"
+              "dist/moira-modern-${VERSION}.appimage"
 
       - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
           name: Moira-AppImage
-          path: dist/*.AppImage
+          path: dist/*.appimage
 
       - name: 发布 Release(仅 tag 推送)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.AppImage
+          files: dist/*.appimage
           name: Moira ${{ github.ref_name }}
           generate_release_notes: true
         env:
