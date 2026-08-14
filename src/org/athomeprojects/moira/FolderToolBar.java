@@ -99,18 +99,18 @@ public class FolderToolBar {
         row_layout.marginHeight = row_layout.marginWidth = 0;
         row_layout.spacing = ICON_SPACING;
         row_layout.wrap = false;
-        row_layout.pack = false;
+        row_layout.pack = true;
         folder_container.setLayout(row_layout);
         // 「操作帮助」按钮已按用户要求移除
         containers[FILE_BAR_ORDER] = new Composite(folder_container, SWT.NONE);
-        GridLayout layout = new GridLayout(6, false);
-        layout.marginHeight = layout.marginWidth = 0;
-        layout.horizontalSpacing = ICON_SPACING;
-        containers[FILE_BAR_ORDER].setLayout(layout);
+        RowLayout group_layout = new RowLayout(SWT.HORIZONTAL);
+        group_layout.marginHeight = group_layout.marginWidth = 0;
+        group_layout.spacing = ICON_SPACING;
+        group_layout.wrap = false;
+        group_layout.pack = true;
+        containers[FILE_BAR_ORDER].setLayout(group_layout);
         CButton blank = new CButton(containers[FILE_BAR_ORDER], "blank_icon",
                 Resource.getString("file_new"));
-        blank.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         blank.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -119,8 +119,6 @@ public class FolderToolBar {
         });
         open = new CButton(containers[FILE_BAR_ORDER], "open_icon", Resource
                 .getString("file_open"));
-        open.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         open.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -129,8 +127,6 @@ public class FolderToolBar {
         });
         save = new CButton(containers[FILE_BAR_ORDER], "save_icon", Resource
                 .getString("file_save"));
-        save.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         save.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -139,8 +135,6 @@ public class FolderToolBar {
         });
         save_as = new CButton(containers[FILE_BAR_ORDER], "saveas_icon",
                 Resource.getString("file_save_as"));
-        save_as.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         save_as.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -149,8 +143,6 @@ public class FolderToolBar {
         });
         CButton print = new CButton(containers[FILE_BAR_ORDER], "print_icon",
                 Resource.getString("file_print"));
-        print.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         print.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -159,8 +151,6 @@ public class FolderToolBar {
         });
         CButton capture = new CButton(containers[FILE_BAR_ORDER],
                 "capture_icon", Resource.getString("file_capture"));
-        capture.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         capture.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -168,14 +158,14 @@ public class FolderToolBar {
             }
         });
         containers[EDIT_BAR_ORDER] = new Composite(folder_container, SWT.NONE);
-        layout = new GridLayout(6, false);
-        layout.marginHeight = layout.marginWidth = 0;
-        layout.horizontalSpacing = ICON_SPACING;
-        containers[EDIT_BAR_ORDER].setLayout(layout);
+        group_layout = new RowLayout(SWT.HORIZONTAL);
+        group_layout.marginHeight = group_layout.marginWidth = 0;
+        group_layout.spacing = ICON_SPACING;
+        group_layout.wrap = false;
+        group_layout.pack = true;
+        containers[EDIT_BAR_ORDER].setLayout(group_layout);
         CButton copy = new CButton(containers[EDIT_BAR_ORDER], "copy_icon",
                 Resource.getString("edit_copy"));
-        copy.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         copy.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -184,8 +174,6 @@ public class FolderToolBar {
         });
         CButton cut = new CButton(containers[EDIT_BAR_ORDER], "cut_icon",
                 Resource.getString("edit_cut"));
-        cut.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         cut.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -194,8 +182,6 @@ public class FolderToolBar {
         });
         CButton paste = new CButton(containers[EDIT_BAR_ORDER], "paste_icon",
                 Resource.getString("edit_paste"));
-        paste.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         paste.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -204,8 +190,6 @@ public class FolderToolBar {
         });
         CButton delete = new CButton(containers[EDIT_BAR_ORDER], "delete_icon",
                 Resource.getString("edit_delete"));
-        delete.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         delete.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -214,8 +198,6 @@ public class FolderToolBar {
         });
         CButton undo = new CButton(containers[EDIT_BAR_ORDER], "undo_icon",
                 Resource.getString("edit_undo"));
-        undo.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         undo.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -224,8 +206,6 @@ public class FolderToolBar {
         });
         CButton redo = new CButton(containers[EDIT_BAR_ORDER], "redo_icon",
                 Resource.getString("edit_redo"));
-        redo.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         redo.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -233,14 +213,14 @@ public class FolderToolBar {
             }
         });
         containers[PREF_BAR_ORDER] = new Composite(folder_container, SWT.NONE);
-        layout = new GridLayout(4, false);
-        layout.marginHeight = layout.marginWidth = 0;
-        layout.horizontalSpacing = ICON_SPACING;
-        containers[PREF_BAR_ORDER].setLayout(layout);
+        group_layout = new RowLayout(SWT.HORIZONTAL);
+        group_layout.marginHeight = group_layout.marginWidth = 0;
+        group_layout.spacing = ICON_SPACING;
+        group_layout.wrap = false;
+        group_layout.pack = true;
+        containers[PREF_BAR_ORDER].setLayout(group_layout);
         CButton mode = new CButton(containers[PREF_BAR_ORDER], "mode_icon",
                 Resource.getString("pref_chart_mode"));
-        mode.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         mode.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -249,8 +229,6 @@ public class FolderToolBar {
         });
         chart = new CButton(containers[PREF_BAR_ORDER], "chart_icon", Resource
                 .getString("pref_show"));
-        chart.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         chart.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -261,8 +239,6 @@ public class FolderToolBar {
         });
         horiz = new CButton(containers[PREF_BAR_ORDER], "horiz_icon", Resource
                 .getString("pref_show_horiz"));
-        horiz.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         horiz.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -271,8 +247,6 @@ public class FolderToolBar {
         });
         aspects = new CButton(containers[PREF_BAR_ORDER], "aspects_icon",
                 Resource.getString("pref_show_aspects"));
-        aspects.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         aspects.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -280,14 +254,15 @@ public class FolderToolBar {
             }
         });
         containers[FIND_BAR_ORDER] = new Composite(folder_container, SWT.NONE);
-        layout = new GridLayout(3, false);
-        layout.marginHeight = layout.marginWidth = 0;
-        layout.horizontalSpacing = ICON_SPACING;
-        containers[FIND_BAR_ORDER].setLayout(layout);
+        // FIND 组含 Combo(需 widthHint),保留 GridLayout(3)
+        GridLayout find_layout = new GridLayout(3, false);
+        find_layout.marginHeight = find_layout.marginWidth = 0;
+        find_layout.horizontalSpacing = ICON_SPACING;
+        containers[FIND_BAR_ORDER].setLayout(find_layout);
         find_field = new Combo(containers[FIND_BAR_ORDER], SWT.BORDER);
         setSearchField(false);
         GridData data = new GridData(GridData.VERTICAL_ALIGN_CENTER);
-        data.widthHint = 120;
+        data.widthHint = 170;
         find_field.setLayoutData(data);
         initFindHistory();
         find_field.addListener(SWT.DefaultSelection, new Listener() {
@@ -327,8 +302,6 @@ public class FolderToolBar {
         });
         CButton next = new CButton(containers[FIND_BAR_ORDER], "next_icon",
                 Resource.getString("tip_next_button") + "    F5");
-        next.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         next.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
@@ -337,8 +310,6 @@ public class FolderToolBar {
         });
         CButton prev = new CButton(containers[FIND_BAR_ORDER], "prev_icon",
                 Resource.getString("tip_prev_button") + "    F6");
-        prev.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
         prev.addMouseListener(new MouseAdapter() {
             public void mouseDown(MouseEvent event)
             {
