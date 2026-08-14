@@ -171,11 +171,32 @@ public class TabManager {
 			if (folder == SUB_FOLDER)
 				tab_folder[MAIN_FOLDER].setSelection(0);
 		}
+		// Linux(GTK) 下 CTabFolder 存在已知渲染缺陷(Eclipse bug 528415
+		// tabs vanish after mouse-over、484794 rendering issues):未选中
+		// tab 页的 control 可能仍然可见,其组框标题(如「星盘分析 - 回归制」)
+		// 会残影渲染在界面上。每次 tab 结构变更后手动同步各页可见性并强
+		// 制重绘(setVisible 与 SWT 内部 showControl 状态一致,幂等无害)
+		CTabItem sel = tab_folder[folder].getSelection();
+		for (int i = 0; i < NUM_TAB_ORDER; i++) {
+			Object w = tab_widget[folder][i];
+			if (w instanceof Control) {
+				Control c = (Control) w;
+				boolean selected = sel != null && sel.getControl() == c;
+				if (c.getVisible() != selected)
+					c.setVisible(selected);
+			}
+		}
+		tab_folder[folder].layout(true, true);
+		tab_folder[folder].redraw();
 	}
 
 	static public CTabFolder initTabFolder(Composite parent, int height) {
 		CTabFolder folder = new CTabFolder(parent, SWT.NONE);
-		folder.setSimple(false);
+		// Linux 下多行模式(setSimple(false))在空间不足时会换行渲染,
+		// 触发 CTabFolder 残影 bug(未选中页组框标题「星盘分析 - 回归制」
+		// 多渲染一行,低分辨率下必现);改单行模式,溢出用 chevron 下拉,
+		// 不再换行,从源头避开问题
+		folder.setSimple(true);
 		folder.setTabHeight((height != 0) ? height : 20);
 		return folder;
 	}

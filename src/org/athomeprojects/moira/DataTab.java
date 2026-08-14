@@ -349,7 +349,10 @@ class DataTab extends BaseTab {
             if (Resource.hasCustomData())
                 group_name += " - " + Resource.getModName();
         }
-        group.setText(group_name);
+        // 同上:主区/独立窗口的 tab 页不显示组框标题,右列副区保留原样
+        int g_folder = Resource.getPrefInt(type + "_folder");
+        group.setText((g_folder == TabManager.MAIN_FOLDER
+                || g_folder == TabManager.WINDOW_FOLDER) ? "" : group_name);
     }
 
     public void updateOverride()
@@ -359,13 +362,10 @@ class DataTab extends BaseTab {
         int folder = Resource.getPrefInt(type + "_folder");
         if (folder == TabManager.MAIN_FOLDER
                 || folder == TabManager.WINDOW_FOLDER) {
-            String str = ChartTab.getData().getOverridenStatus();
-            if (str.equals("")) {
-                group.setText(group_name);
-            } else {
-                group.setText(group_name + "    [" + str
-                        + Resource.getString("mod_label") + "]");
-            }
+            // Linux GTK 下 Group 标题渲染在边框线上,紧贴标签栏,视觉上
+            // 像「多渲染一行」(用户确认「星盘分析 - 回归制」为多余);
+            // 主区/独立窗口的 tab 页不再显示组框标题
+            group.setText("");
         } else {
             String str = ChartMode.isChartMode(ChartMode.PICK_MODE) ? Resource
                     .getString("pick_data_label") : tab_name;

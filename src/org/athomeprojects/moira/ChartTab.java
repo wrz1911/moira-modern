@@ -375,6 +375,12 @@ class ChartTab {
         if (ui_mode) {
             moveEntryField(ui_diagram.getEntryField());
             top_layout.topControl = ui_group;
+            // GTK 下 StackLayout 切换后旧页面可能未隐藏,两页叠加渲染
+            // (combo 里的组框标题「星盘分析 - 回归制」残影浮在 UI 模式
+            // 界面上);手动同步两页可见性并强制布局
+            combo.setVisible(false);
+            ui_group.setVisible(true);
+            top.layout(true, true);
             top.layout();
         }
         if (data.getAngleMarkerEnable()[0]) {
@@ -1940,6 +1946,12 @@ class ChartTab {
             }
             moveEntryField(ui_diagram.getEntryField());
             top_layout.topControl = ui_group;
+            // GTK 下 StackLayout 切换后旧页面可能未隐藏,两页叠加渲染
+            // (combo 里的组框标题「星盘分析 - 回归制」残影浮在 UI 模式
+            // 界面上);手动同步两页可见性并强制布局
+            combo.setVisible(false);
+            ui_group.setVisible(true);
+            top.layout(true, true);
         } else {
             ui_mode = false;
             moveEntryField(null);
@@ -1952,6 +1964,10 @@ class ChartTab {
                 }
             }
             top_layout.topControl = combo;
+            // 同上:从 UI 模式切回大图模式时同步可见性并强制布局
+            ui_group.setVisible(false);
+            combo.setVisible(true);
+            top.layout(true, true);
         }
         Moira.setShellPosition(null, null);
         Moira.setShellState();
