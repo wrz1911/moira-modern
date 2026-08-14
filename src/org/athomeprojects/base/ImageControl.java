@@ -132,11 +132,18 @@ public class ImageControl {
 		g2d.scale(scale, scale);
 		int scaled_width = (int) (image_width / scale);
 		int scaled_height = (int) (image_height / scale);
-		ChartData.getData().pageDiagram(g2d, "", scaler,
+		// 导出保持标准布局:屏幕拖动的区域偏移清零,导出后恢复
+		int[] saved_offset = ChartData.screen_offset;
+		ChartData.screen_offset = ChartData.defaultRegionOffset();
+		try {
+			ChartData.getData().pageDiagram(g2d, "", scaler,
 				new java.awt.Point(scaled_width, scaled_height),
 				new java.awt.Point(width, width), false, true, false,
 				chart_only, true, false,
 				Resource.getPrefInt("image_vertical_text") != 0, false);
+		} finally {
+			ChartData.screen_offset = saved_offset;
+		}
 		g2d.dispose();
 		return image;
 	}
@@ -168,11 +175,17 @@ public class ImageControl {
 		svg.scale(scale, scale);
 		int scaled_width = (int) (image_width / scale);
 		int scaled_height = (int) (image_height / scale);
-		ChartData.getData().pageDiagram(svg, "", scaler,
+		int[] saved_offset = ChartData.screen_offset;
+		ChartData.screen_offset = ChartData.defaultRegionOffset();
+		try {
+			ChartData.getData().pageDiagram(svg, "", scaler,
 				new java.awt.Point(scaled_width, scaled_height),
 				new java.awt.Point(diag_width, diag_width), false, true, false,
 				chart_only, true, false,
 				Resource.getPrefInt("image_vertical_text") != 0, false);
+		} finally {
+			ChartData.screen_offset = saved_offset;
+		}
 		try {
 			SVGUtils.writeToSVG(svg_file, svg.getSVGElement());
 		} catch (IOException e) {

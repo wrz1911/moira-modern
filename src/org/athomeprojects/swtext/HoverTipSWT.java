@@ -43,6 +43,15 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 	// 坐标系解释;GTK3 下是顶层窗口,setBounds 用屏幕坐标
 	private static final boolean GTK4 = isGTK4();
 
+
+	// 弹窗当前是否显示:角度标记线(DrawSWT.drawMarker)绘制时若弹窗
+	// 显示中,先擦除标记线并暂停跟随,避免 hideTip 与 hover 重弹的闪烁循环
+	static public volatile boolean showing;
+
+	// 角度标记(相位测量)模式:由 DrawSWT.initMarker/endMarker 设置;
+	// 测量模式下完全禁用悬停弹窗(十字光标+标线,再按中键恢复)
+	static public volatile boolean marker_mode;
+
 	private Shell shell;
 
 	// 主窗口(构造时传入),GTK4 下用于屏幕坐标转主窗口坐标
@@ -116,7 +125,9 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 		shell.setLayout(gridLayout);
 		shell.setBackground(display.getSystemColor(SWT.COLOR_INFO_BACKGROUND));
 		text = new Label(shell, SWT.NONE);
-		text.setForeground(display.getSystemColor(SWT.COLOR_INFO_FOREGROUND));
+		// 不用 COLOR_INFO_FOREGROUND:GTK4 下该系统色返回白色,
+		// 与米白背景同色导致文字不可见;改用 prop 可配前景色
+		text.setForeground(ColorManager.getColor("tip_fg_color"));
 		text.setBackground(ColorManager.getColor("tip_bg_color"));
 		text.setLayoutData(new GridData(GridData.FILL_HORIZONTAL
 				| GridData.VERTICAL_ALIGN_CENTER));
@@ -138,6 +149,7 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 	}
 
 	public void hide() {
+		showing = false;
 		if (!hidden && !timer_hint && shell != null && !shell.isDisposed()
 				&& shell.isVisible()) {
 			shell.setVisible(false);
@@ -188,7 +200,7 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 	}
 
 	public void mouseHover(MouseEvent event) {
-		if (tip == null || mouse_down || timer_hint)
+		if (tip == null || mouse_down || timer_hint || marker_mode)
 			return;
 		// GTK4 popover popup 会重置 SWT 的 hover 状态,指针静止时 mouseHover
 		// 重复派发(实测 400-800ms 三连发),重复 popup 造成闪烁;
@@ -228,6 +240,7 @@ public class HoverTipSWT implements MouseListener, MouseMoveListener,
 		shell.setVisible(true);
 		calibrateOffset();
 		hidden = false;
+		showing = true;
 		shown_pos = new Point(cur.x, cur.y); // 记录实时光标位置(与 mouseMove event 同域)
 		first_motion_seen = false;
 		last_motion_pos = null;

@@ -19,6 +19,7 @@
 package org.athomeprojects.moira;
 
 import org.athomeprojects.swtext.ColorManager;
+import org.athomeprojects.swtext.HoverTipSWT;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.FontMetrics;
@@ -42,10 +43,12 @@ public class DrawSWT {
 
 	static private String[] color_key = null;
 
-	static private GC tracker_gc = null, rubber_band_gc = null;
+	static private GC rubber_band_gc = null;
 
+	// 角度标记线状态:线在画布 paint 管线中绘制(不单独持有 GC,
+	// 任何重绘都不会丢失),drawMarker 只更新跟踪位置
 	static private int tracker_radius_sq, tracker_center_x, tracker_center_y,
-			tracker_x, tracker_y;
+			tracker_x, tracker_y, tracker_width;
 
 	static private int[] tracker_pos;
 
@@ -166,34 +169,33 @@ public class DrawSWT {
 	}
 
 	static public boolean isMarkerEnabled() {
-		return tracker_gc != null;
+		return tracker_pos != null;
 	}
 
-	static public void initMarker(Canvas canvas, int[] color, int[] display,
-			double[] angle, int width) {
+	// 初始化测量模式(相位/角度定义与颜色)。线本身不在此绘制,
+	// 由画布 paint 管线(drawMarkerOn)绘制,任何重绘都不会丢失
+	static public void initMarker(int[] color, int[] display, double[] angle,
+			int width) {
 		if (angle == null)
 			return;
-		if (tracker_gc != null)
+		if (isMarkerEnabled())
 			endMarker();
-		tracker_gc = new GC(canvas);
+		// 测量模式:禁用悬停弹窗,并收起已显示的弹窗
+		HoverTipSWT.marker_mode = true;
+		ChartTab.hideTip();
 		tracker_color = new Color[color.length];
 		int len = Math.min(color.length, display.length);
 		for (int i = 0; i < len; i++) {
-			if (display[i] == 0) {
-				tracker_color[i] = null;
-			} else {
-				int val = ~color[i]; // invert color
-				tracker_color[i] = ColorManager.allocateColor(val);
-			}
+			tracker_color[i] = (display[i] == 0) ? null : ColorManager
+					.allocateColor(color[i]);
 		}
-		tracker_gc.setXORMode(true);
-		tracker_gc.setLineWidth(width);
+		tracker_width = width;
 		tracker_pos = null;
 		tracker_angle = angle;
 	}
 
 	static public boolean initMarkerPos(int[] center, int[] pos) {
-		if (tracker_gc == null || pos == null || (pos.length % 2) == 1) {
+		if (tracker_color == null || pos == null || (pos.length % 2) == 1) {
 			tracker_pos = null;
 			return false;
 		}
@@ -206,12 +208,15 @@ public class DrawSWT {
 		return true;
 	}
 
+	// 更新标记线跟踪位置(负数 = 取消);绘制由 paint 管线完成,
+	// 调用方在位置变化后 redraw 画布即可
 	static public void drawMarker(int x, int y) {
 		if (tracker_pos == null)
 			return;
-		ChartTab.hideTip();
-		if (tracker_x >= 0)
-			drawMarkerLines(tracker_x, tracker_y);
+		if (x < 0 || y < 0) {
+			tracker_x = tracker_y = -1;
+			return;
+		}
 		int dist_sq = getPointDistSqFromCenter(tracker_center_x,
 				tracker_center_y, x, y);
 		if (tracker_radius_sq > 0 && dist_sq > tracker_radius_sq) {
@@ -220,35 +225,35 @@ public class DrawSWT {
 			tracker_x = x;
 			tracker_y = y;
 		}
-		if (tracker_x >= 0)
-			drawMarkerLines(tracker_x, tracker_y);
 	}
 
-	static private void drawMarkerLines(int x, int y) {
-		x -= tracker_center_x;
-		y -= tracker_center_y;
+	// 画布 paint 中调用:在指定 GC 上绘制标记线(从内圈到外圈连续线)
+	static public void drawMarkerOn(GC gc) {
+		if (gc == null || tracker_pos == null || tracker_x < 0 || tracker_y < 0)
+			return;
+		int x = tracker_x - tracker_center_x;
+		int y = tracker_y - tracker_center_y;
 		if (x == 0 && y == 0)
 			return;
 		double base = Math.atan2(y, x);
 		int len = Math.min(tracker_angle.length, tracker_color.length);
+		gc.setLineWidth(tracker_width);
 		for (int j = 0; j < len; j++) {
 			Color color = tracker_color[j];
 			if (color == null)
 				continue;
 			double degree = tracker_angle[j];
-			tracker_gc.setForeground(color);
+			gc.setForeground(color);
 			for (int k = -1; k <= 1; k += 2) {
 				double angle = base + k * degree * DEGREE;
 				double cos = Math.cos(angle);
 				double sin = Math.sin(angle);
-				for (int i = 0; i < tracker_pos.length; i += 2) {
-					int lower = tracker_pos[i];
-					int upper = tracker_pos[i + 1];
-					tracker_gc.drawLine((int) (lower * cos) + tracker_center_x,
-							(int) (lower * sin) + tracker_center_y,
-							(int) (upper * cos) + tracker_center_x,
-							(int) (upper * sin) + tracker_center_y);
-				}
+				int lower = tracker_pos[0];
+				int upper = tracker_pos[tracker_pos.length - 1];
+				gc.drawLine((int) (lower * cos) + tracker_center_x,
+						(int) (lower * sin) + tracker_center_y,
+						(int) (upper * cos) + tracker_center_x,
+						(int) (upper * sin) + tracker_center_y);
 				if (Math.abs(degree) < 0.1 || Math.abs(degree - 180.0) < 0.1)
 					break;
 			}
@@ -256,9 +261,8 @@ public class DrawSWT {
 	}
 
 	static public void endMarker() {
-		if (tracker_gc == null)
+		if (tracker_color == null)
 			return;
-		DrawSWT.drawMarker(-1, -1); // cancel
 		for (int i = 0; i < tracker_color.length; i++) {
 			Color color = tracker_color[i];
 			if (color != null)
@@ -267,8 +271,7 @@ public class DrawSWT {
 		tracker_color = null;
 		tracker_pos = null;
 		tracker_angle = null;
-		tracker_gc.dispose();
-		tracker_gc = null;
+		HoverTipSWT.marker_mode = false;
 	}
 
 	static public int getPointDistSqFromCenter(int center_x, int center_y,
@@ -438,6 +441,6 @@ public class DrawSWT {
 
 	static public void drawCancel() {
 		DrawSWT.drawRubberBandLine(null, null);
-		DrawSWT.drawMarker(-1, -1);
+		// 标记线在画布 paint 管线中绘制,重绘自动覆盖,无需 cancel
 	}
 }

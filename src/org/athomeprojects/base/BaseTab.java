@@ -59,6 +59,10 @@ abstract public class BaseTab {
 	public void replace(String src, String dst) {
 	}
 
+	// 自动着色/格式美化(文本填充完成后调用,默认无操作,DataTab 重写)
+	public void applyAutoStyle() {
+	}
+
 	public int initPrint(Graphics2D g2d, String data, Point page_size) {
 		area = new JTextArea(data);
 		area.setDoubleBuffered(false);

@@ -608,7 +608,8 @@ public class Moira {
 				prefix = "";
 			if (win == null)
 				win = shell;
-			if (!default_only && Resource.hasPrefKey(prefix + "bounds")) {
+			if (!default_only && Resource.hasPrefKey(prefix + "bounds")
+					&& Resource.hasPrefInt("hi_auto_window")) {
 				int[] bounds = FileIO.toIntArray(Resource.getPrefString(prefix
 						+ "bounds"));
 				pos.x = bounds[0];
@@ -616,9 +617,18 @@ public class Moira {
 				pos.width = Math.min(max_rect.width, bounds[2]);
 				pos.height = Math.min(max_rect.height, bounds[3]);
 			} else {
+				// HiDPI 迁移:升级后首次启动忽略旧 bounds,
+				// 按屏幕比例自动定窗口尺寸,之后恢复尊重用户摆放
+				Resource.putPrefInt("hi_auto_window", 1);
 				if (Resource.hasKey(prefix + "window_size")) {
 					int[] dim = new int[2];
 					Resource.getIntArray(prefix + "window_size", dim);
+					// 尺寸为 0 表示按屏幕比例自动适配(1080p/2K/4K
+					// 及 KDE/GNOME 缩放通用,SWT 尺寸均为逻辑坐标)
+					if (dim[0] <= 0)
+						dim[0] = (int) (max_rect.width * 0.72);
+					if (dim[1] <= 0)
+						dim[1] = (int) (max_rect.height * 0.85);
 					pos.width = Math.min(max_rect.width, dim[0]);
 					pos.height = Math.min(max_rect.height, dim[1]);
 				} else {

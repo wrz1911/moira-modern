@@ -424,6 +424,163 @@ class DataTab extends BaseTab {
         updateAttribute(false);
     }
 
+    // ---- 自动着色(文本填充完成后调用) ----
+    // 五行色(天干地支):木青、火红、土棕、金暗金、水蓝
+    private static final int COLOR_WOOD = 0x2e7d32;
+    private static final int COLOR_FIRE = 0xc62828;
+    private static final int COLOR_EARTH = 0x8d6e63;
+    private static final int COLOR_METAL = 0xb26a00;
+    private static final int COLOR_WATER = 0x1565c0;
+
+    // 十神色:比劫、食伤、财、官杀、印
+    private static final int COLOR_BIJIE = 0x5d4037;
+    private static final int COLOR_SHISHANG = 0xef6c00;
+    private static final int COLOR_CAI = 0x00897b;
+    private static final int COLOR_GUANSHA = 0xc62828;
+    private static final int COLOR_YIN = 0x2e7d32;
+
+    // 行首标签(如「农历:」)与度数值
+    private static final int COLOR_LABEL = 0x37474f;
+    private static final int COLOR_DEGREE = 0x1565c0;
+
+    @Override
+    public void applyAutoStyle()
+    {
+        String content = text.getText();
+        if (content.isEmpty())
+            return;
+        java.util.List<org.eclipse.swt.custom.StyleRange> ranges = new java.util.ArrayList<>();
+        if (type.equals("pole"))
+            applyPoleStyle(content, ranges);
+        else if (type.equals("data"))
+            applyDataStyle(content, ranges);
+        if (!ranges.isEmpty()) {
+            // SWT 要求按位置升序且不重叠:排序后裁剪重叠区(保留先添加者)
+            java.util.Collections.sort(ranges, (a, b) -> a.start - b.start);
+            java.util.List<org.eclipse.swt.custom.StyleRange> merged = new java.util.ArrayList<>();
+            for (org.eclipse.swt.custom.StyleRange r : ranges) {
+                if (!merged.isEmpty()) {
+                    org.eclipse.swt.custom.StyleRange last = merged
+                            .get(merged.size() - 1);
+                    int end = r.start + r.length;
+                    if (r.start < last.start + last.length) {
+                        if (end <= last.start + last.length)
+                            continue; // 完全被包含,丢弃
+                        r = new org.eclipse.swt.custom.StyleRange(last.start
+                                + last.length, end - last.start - last.length,
+                                r.foreground, r.background, r.fontStyle);
+                    }
+                }
+                merged.add(r);
+            }
+            text.setStyleRanges(merged
+                    .toArray(new org.eclipse.swt.custom.StyleRange[0]));
+        }
+    }
+
+    private void applyPoleStyle(String s,
+            java.util.List<org.eclipse.swt.custom.StyleRange> ranges)
+    {
+        // 天干地支五行着色 + 十神分类着色
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            int color = 0;
+            switch (c) {
+                case '甲':
+                case '乙':
+                case '寅':
+                case '卯':
+                    color = COLOR_WOOD;
+                    break;
+                case '丙':
+                case '丁':
+                case '巳':
+                case '午':
+                    color = COLOR_FIRE;
+                    break;
+                case '戊':
+                case '己':
+                case '辰':
+                case '戌':
+                case '丑':
+                case '未':
+                    color = COLOR_EARTH;
+                    break;
+                case '庚':
+                case '辛':
+                case '申':
+                case '酉':
+                    color = COLOR_METAL;
+                    break;
+                case '壬':
+                case '癸':
+                case '亥':
+                case '子':
+                    color = COLOR_WATER;
+                    break;
+                case '比':
+                case '劫':
+                    color = COLOR_BIJIE;
+                    break;
+                case '食':
+                case '伤':
+                    color = COLOR_SHISHANG;
+                    break;
+                case '财':
+                    color = COLOR_CAI;
+                    break;
+                case '官':
+                case '杀':
+                    color = COLOR_GUANSHA;
+                    break;
+                case '印':
+                    color = COLOR_YIN;
+                    break;
+                default:
+                    break;
+            }
+            if (color != 0)
+                ranges.add(new org.eclipse.swt.custom.StyleRange(i, 1,
+                        getColor(color), null));
+        }
+        addLabelStyles(s, ranges);
+    }
+
+    private void applyDataStyle(String s,
+            java.util.List<org.eclipse.swt.custom.StyleRange> ranges)
+    {
+        // 度数/数值着色:如 24°36′、18°、2026 年 8 月
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("\\d+(?:°\\d*′?|°|\\s*[年月日时])?")
+                .matcher(s);
+        while (m.find()) {
+            String t = m.group();
+            // 忽略纯个位空格误配(如「2026 年」允许,单数字不带单位跳过)
+            if (t.matches("\\d+") && t.length() < 3)
+                continue;
+            ranges.add(new org.eclipse.swt.custom.StyleRange(m.start(), t
+                    .length(), getColor(COLOR_DEGREE), null));
+        }
+        addLabelStyles(s, ranges);
+    }
+
+    // 行首「标签:」加粗深色,提升扫描性
+    private void addLabelStyles(String s,
+            java.util.List<org.eclipse.swt.custom.StyleRange> ranges)
+    {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(?m)^\\s*([^:\\r\\n]{1,10}):").matcher(s);
+        while (m.find()) {
+            ranges.add(new org.eclipse.swt.custom.StyleRange(m.start(1), m
+                    .group(1).length(), getColor(COLOR_LABEL), null, SWT.BOLD));
+        }
+    }
+
+    private Color getColor(int rgb)
+    {
+        return ColorManager.getColor(rgb);
+    }
+
     public void append(String str)
     {
         text.append(str);

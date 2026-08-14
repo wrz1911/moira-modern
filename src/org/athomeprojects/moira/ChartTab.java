@@ -122,7 +122,7 @@ class ChartTab {
 
     private int[] tab_orders;
 
-    private Group[] desc_group = new Group[2];
+    private Composite[] desc_group = new Composite[2];
 
     private Canvas[] desc = new Canvas[2];
 
@@ -160,6 +160,16 @@ class ChartTab {
     private MenuItem[] toggle_menu_item;
 
     private boolean in_drag, reset_draw;
+
+    // 区域文字拖拽:Shift+拖动移动象限文字(盘面本身不参与);
+    // 偏移存 ChartData.screen_offset,拖动结束持久化到 prefs
+    private boolean region_dragging;
+
+    private int region_no;
+
+    private Point region_start;
+
+    private double last_diagram_scale = 1.0;
 
     private int min_right_width;
 
@@ -207,6 +217,17 @@ class ChartTab {
         diagram_scroll.setExpandHorizontal(true);
         diagram_scroll.setLayout(new FillLayout());
         tip_handler = new HoverTipSWT(Moira.getShell());
+        if (Resource.hasPrefKey("screen_offset")) {
+            int[] saved = Resource.getPrefIntArray("screen_offset");
+            // 兼容旧版(4 象限 8 值):长度不足补零
+            int n = 2 * ChartData.NUM_SCREEN_REGION;
+            ChartData.screen_offset = new int[n];
+            for (int i = 0; i < n && i < saved.length; i++)
+                ChartData.screen_offset[i] = saved[i];
+        } else {
+            // 无用户拖动记录:使用默认四角边距排版
+            ChartData.screen_offset = ChartData.defaultRegionOffset();
+        }
         diagram = new Canvas(diagram_scroll, SWT.NO_BACKGROUND | SWT.BORDER);
         MenuFolder.addCommandListener(diagram);
         addDiagramListener(diagram);
@@ -220,7 +241,9 @@ class ChartTab {
         addDiagramListener(ui_diagram);
         top_composite = new Composite(lr_combo, SWT.NONE);
         GridLayout grid_layout = new GridLayout(1, false);
-        grid_layout.marginWidth = grid_layout.marginHeight = 0;
+        // 面板整体留白与组间距(现代排版:内容不再贴边)
+        grid_layout.marginWidth = grid_layout.marginHeight = 8;
+        grid_layout.verticalSpacing = 6;
         top_composite.setLayout(grid_layout);
         lr_combo.setWeights(new int[] { 70, 30 });
         // dock_sash 为垂直 SashForm,未设 weights 时按子控件 natural 高度
@@ -240,15 +263,23 @@ class ChartTab {
         ctrl_composite.setLayout(grid_layout);
         group = new Group(ctrl_composite, SWT.NONE);
         group_name = "";
-        group.setLayout(new GridLayout(1, true));
+        GridLayout group_layout = new GridLayout(1, true);
+        group_layout.marginWidth = group_layout.marginHeight = 8;
+        group_layout.verticalSpacing = 6;
+        group.setLayout(group_layout);
         date_composite = new Composite(group, SWT.NONE);
-        grid_layout = new GridLayout(2, false);
+        grid_layout = new GridLayout(1, false);
         grid_layout.marginWidth = grid_layout.marginHeight = 0;
+        grid_layout.verticalSpacing = 6;
         date_composite.setLayout(grid_layout);
         birth = new CalendarSpinner(date_composite, SWT.BORDER);
+        birth.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
         birth.init(false);
+        // 排盘主操作按钮:带文字全宽(与画布「输入」按钮风格统一)
         update = new Button(date_composite, SWT.PUSH);
         ImageManager.setImageButton(update, "button_icon");
+        update.setText(Resource.getString("update_button"));
+        update.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
         update.setToolTipText(Resource.getString("tip_update_button")
                 + "    F1");
         update.addSelectionListener(new SelectionAdapter() {
@@ -265,12 +296,10 @@ class ChartTab {
         sub_folder.setLayoutData(new GridData(GridData.FILL_BOTH));
         TabManager.initFolder(TabManager.SUB_FOLDER, sub_folder);
         final ScrolledComposite[] desc_scroll = new ScrolledComposite[2];
+        // 图表页原为 Group(组框标题与 tab 名重复占空间),改 Composite,
+        // 由 TabManager.setTabItem 注册为标签页
         for (int i = 0; i < 2; i++) {
-            desc_group[i] = new Group(sub_folder, SWT.NONE);
-            String key = Resource
-                    .getString((i == 0) ? "year_data_plus_eight_char"
-                            : "year_data");
-            desc_group[i].setText(key);
+            desc_group[i] = new Composite(sub_folder, SWT.NONE);
             desc_group[i].setLayout(new FillLayout());
             desc_scroll[i] = new ScrolledComposite(desc_group[i], SWT.H_SCROLL
                     | SWT.V_SCROLL);
@@ -402,7 +431,7 @@ class ChartTab {
             top.layout();
         }
         if (data.getAngleMarkerEnable()[0]) {
-            DrawSWT.initMarker(getDiagram(), data.getAspectColorArray(true),
+            DrawSWT.initMarker(data.getAspectColorArray(true),
                     data.getAspectDisplayArray(true),
                     data.getAspectDegreeArray(true),
                     Resource.getInt("angle_marker_width"));
@@ -431,6 +460,14 @@ class ChartTab {
 
             public void mouseUp(MouseEvent event)
             {
+                if (region_dragging) {
+                    region_dragging = false;
+                    Control c = (Control) event.getSource();
+                    c.setCapture(false);
+                    Resource.putPrefIntArray("screen_offset",
+                            ChartData.screen_offset);
+                    return;
+                }
                 if (in_drag) {
                     Moira.setCursor(0, false);
                     Control c = (Control) event.getSource();
@@ -443,17 +480,33 @@ class ChartTab {
                         c.redraw(bound.x, bound.y, bound.width, bound.height,
                                 false);
                     }
-                } else if (!processClick(event) && event.button != 1
-                        && (event.stateMask & SWT.CONTROL) != SWT.CONTROL) {
+                } else if (event.button == 2) {
+                    // 中键:盘面任意位置开关标记线(优先于点击业务,
+                    // 避免命中流年数字等区域被当作改日期)
                     boolean[] enable = data.getAngleMarkerEnable();
                     enable[0] = !enable[0];
                     data.setAngleMarkerEnable(enable);
                     updateAngleMarker(event.x, event.y);
+                } else if (!processClick(event) && event.button != 1
+                        && (event.stateMask & SWT.CONTROL) != SWT.CONTROL) {
+                    // 右键:仅保留点击业务(反向选点等),不再开关标记线
                 }
             }
 
             public void mouseDown(MouseEvent event)
             {
+                // Shift+左键:拖动最近的文字区域(盘面本身不参与)
+                if (event.button == 1
+                        && (event.stateMask & SWT.SHIFT) == SWT.SHIFT) {
+                    Control c = (Control) event.getSource();
+                    region_no = hitRegion(event.x, event.y, c.getSize());
+                    if (region_no >= 0) {
+                        region_dragging = true;
+                        region_start = new Point(event.x, event.y);
+                        c.setCapture(true);
+                    }
+                    return;
+                }
                 if (event.button == 1
                         && (ChartMode.isChartMode(ChartMode.TRADITIONAL_MODE) || ChartMode
                                 .isChartMode(ChartMode.SIDEREAL_MODE))) {
@@ -485,6 +538,26 @@ class ChartTab {
         canvas.addMouseMoveListener(new MouseMoveListener() {
             public void mouseMove(MouseEvent event)
             {
+                if (region_dragging) {
+                    int dx = event.x - region_start.x;
+                    int dy = event.y - region_start.y;
+                    region_start = new Point(event.x, event.y);
+                    // 屏幕位移换算图内坐标(ui 模式有 scale)
+                    int ox = (int) (dx / last_diagram_scale);
+                    int oy = (int) (dy / last_diagram_scale);
+                    int[] off = ChartData.screen_offset;
+                    off[2 * region_no] += ox;
+                    off[2 * region_no + 1] += oy;
+                    // 偏移已变,缓存图须失效才会重绘
+                    CacheEntry ce = getCacheEntry();
+                    if (ce != null && ce.getImage() != null) {
+                        ce.getImage().dispose();
+                        ce.setImage(null);
+                    }
+                    Control c = (Control) event.getSource();
+                    c.redraw();
+                    return;
+                }
                 if (in_drag) {
                     double degree = drag_tip.getDegreeFromPoint(event.x,
                             event.y, true);
@@ -495,7 +568,10 @@ class ChartTab {
                     DrawSWT.drawRubberBandLine(mesg,
                             c.toDisplay(event.x, event.y));
                 }
-                DrawSWT.drawMarker(event.x, event.y);
+                if (DrawSWT.isMarkerEnabled()) {
+                    DrawSWT.drawMarker(event.x, event.y);
+                    getDiagram().redraw();
+                }
                 CButton.deselectAll();
             }
         });
@@ -1354,6 +1430,34 @@ class ChartTab {
         composite.update();
     }
 
+    // Shift 拖拽命中检测:屏幕坐标 → 图内坐标,找最近的区域锚点
+    // (阈值 220px,超出视为点在盘面上不拖)
+    private int hitRegion(int sx, int sy, Point canvas_size)
+    {
+        double scale = last_diagram_scale;
+        if (scale <= 0)
+            scale = 1.0;
+        double fx = sx / scale;
+        double fy = sy / scale;
+        int best = -1;
+        // 图内阈值:约合屏幕 415px(scale≈0.0346);比旧 220(≈8px)宽,
+        // 锚点即区域参考点,按最近命中
+        double best_d = 12000.0 * 12000.0;
+        for (int i = 0; i < ChartData.NUM_SCREEN_REGION; i++) {
+            java.awt.Point a = ChartData.region_anchors[i];
+            if (a == null)
+                continue;
+            double dx = fx - (a.x + ChartData.screen_offset[2 * i]);
+            double dy = fy - (a.y + ChartData.screen_offset[2 * i + 1]);
+            double d = dx * dx + dy * dy;
+            if (d < best_d) {
+                best_d = d;
+                best = i;
+            }
+        }
+        return best;
+    }
+
     private void showDiagram(PaintEvent event, Point size)
     {
         CacheEntry entry = getCacheEntry();
@@ -1361,7 +1465,11 @@ class ChartTab {
             event.gc.fillRectangle(event.x, event.y, event.width, event.height);
             if (entry.getImage() != null)
                 entry.getImage().dispose();
-            BufferedImage g2d_image = new BufferedImage(size.x, size.y,
+            // HiDPI:按物理像素渲染,消除 KDE/GNOME 分数缩放下的盘面模糊
+            double dpi_scale = HiDPIUtil.getScreenScale();
+            int phys_x = (int) Math.round(size.x * dpi_scale);
+            int phys_y = (int) Math.round(size.y * dpi_scale);
+            BufferedImage g2d_image = new BufferedImage(phys_x, phys_y,
                     BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = (Graphics2D) g2d_image.getGraphics();
             // 开启抗锯齿,避免排盘文字与线条在 Linux 上出现锯齿
@@ -1369,6 +1477,8 @@ class ChartTab {
                     RenderingHints.VALUE_ANTIALIAS_ON);
             g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
                     RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            // 之后所有绘制坐标保持逻辑坐标,由该变换换算到物理像素
+            g2d.scale(dpi_scale, dpi_scale);
             if (ui_mode) {
                 int edge_spacing = Resource.getInt("ui_diagram_edge_spacing");
                 int image_width = size.x - 2 * edge_spacing;
@@ -1382,6 +1492,7 @@ class ChartTab {
                 width *= scaler;
                 double scale = (double) Math.min(image_width, image_height)
                         / width;
+                last_diagram_scale = scale;
                 g2d.scale(scale, scale);
                 int scaled_width = (int) (image_width / scale);
                 int scaled_height = (int) (image_height / scale);
@@ -1402,44 +1513,57 @@ class ChartTab {
                 DrawAWT draw = new DrawAWT();
                 draw.init(g2d, 1, "", false,
                         Resource.getPrefInt("display_vertical_text") != 0);
+                last_diagram_scale = 1.0;
                 data.drawDiagram(draw, null,
                         new java.awt.Point(size.x, size.y), data.getNoColor(),
                         false, false, true);
                 entry.setDrawSize(data.getDrawSize(), 1.0, 0);
             }
             g2d.dispose();
-            entry.setImage(copyImage(g2d_image, size));
+            entry.setImage(copyImage(g2d_image));
+            entry.setLastSize(size);
             reset_draw = DrawSWT.isMarkerEnabled();
         }
         DrawSWT.drawCancel();
-        event.gc.drawImage(entry.getImage(), event.x, event.y, event.width,
-                event.height, event.x, event.y, event.width, event.height);
+        Image img = entry.getImage();
+        event.gc.drawImage(img, 0, 0, img.getBounds().width,
+                img.getBounds().height, event.x, event.y, event.width,
+                event.height);
+        // 标记线在盘面绘制管线中绘制(而非独立 GC),任何重绘都不会丢失
+        if (DrawSWT.isMarkerEnabled())
+            DrawSWT.drawMarkerOn(event.gc);
         if (entry.tip != null)
             entry.tip.setTipScale(entry.getDrawSize());
-        if (reset_draw) {
-            DrawSWT.endMarker();
-            DrawSWT.initMarker(getDiagram(), data.getAspectColorArray(true),
-                    data.getAspectDisplayArray(true),
-                    data.getAspectDegreeArray(true),
-                    Resource.getInt("angle_marker_width"));
+        // 重渲染后盘面几何可能变化,更新标记线位置参数;prefs 已开启但
+        // 尚未初始化(启动场景)时也在首次绘制后补初始化并同步十字光标
+        if (reset_draw || (data.getAngleMarkerEnable()[0] && !DrawSWT
+                .isMarkerEnabled())) {
+            if (!DrawSWT.isMarkerEnabled())
+                DrawSWT.initMarker(data.getAspectColorArray(true),
+                        data.getAspectDisplayArray(true),
+                        data.getAspectDegreeArray(true),
+                        Resource.getInt("angle_marker_width"));
             int[] pos = data.getAngleMarkerArray(false, ui_mode,
                     entry.getRadius());
             DrawSWT.initMarkerPos(entry.getDrawSize(), pos);
             reset_draw = false;
+            updateMarkerCursor();
         }
     }
 
-    private Image copyImage(BufferedImage image, Point size)
+    private Image copyImage(BufferedImage image)
     {
-        ImageData image_data = new ImageData(size.x, size.y, 24, PALETTE_DATA);
+        int width = image.getWidth();
+        int height = image.getHeight();
+        ImageData image_data = new ImageData(width, height, 24, PALETTE_DATA);
         image_data.transparentPixel = TRANSPARENT_COLOR;
         byte[] swt_data = image_data.data;
-        int[] g2d_data = new int[size.x * size.y];
-        image.getRGB(0, 0, size.x, size.y, g2d_data, 0, size.x);
-        for (int i = 0; i < size.y; i++) {
+        int[] g2d_data = new int[width * height];
+        image.getRGB(0, 0, width, height, g2d_data, 0, width);
+        for (int i = 0; i < height; i++) {
             int idx = i * image_data.bytesPerLine;
-            for (int j = 0; j < size.x; j++) {
-                int rgb = g2d_data[j + i * size.x];
+            for (int j = 0; j < width; j++) {
+                int rgb = g2d_data[j + i * width];
                 for (int k = image_data.depth - 8; k >= 0; k -= 8) {
                     swt_data[idx++] = (byte) ((rgb >> k) & 0xFF);
                 }
@@ -1649,35 +1773,44 @@ class ChartTab {
 
     public void updateAngleMarker(int x, int y)
     {
-        if (DrawSWT.isMarkerEnabled())
+        if (DrawSWT.isMarkerEnabled()) {
             DrawSWT.endMarker();
+            getDiagram().redraw(); // 清除屏幕上的旧标记线
+        }
         boolean[] enable = data.getAngleMarkerEnable();
         if (enable[0]) {
             CacheEntry entry = getCacheEntry();
             int[] pos = data.getAngleMarkerArray(false, ui_mode,
                     entry.getRadius());
-            if (pos != null) {
-                if (x >= 0 && y >= 0) { // toggle check
-                    int[] draw_size = entry.getDrawSize();
-                    int dist_sq = DrawSWT.getPointDistSqFromCenter(
-                            draw_size[0], draw_size[1], x, y);
-                    if (dist_sq <= draw_size[2] * draw_size[2])
-                        enable[0] = false;
-                }
-            } else {
+            if (pos == null)
                 enable[0] = false;
-            }
             if (enable[0]) {
-                DrawSWT.initMarker(getDiagram(),
-                        data.getAspectColorArray(true),
+                DrawSWT.initMarker(data.getAspectColorArray(true),
                         data.getAspectDisplayArray(true),
                         data.getAspectDegreeArray(true),
                         Resource.getInt("angle_marker_width"));
-                DrawSWT.initMarkerPos(entry.getDrawSize(), pos);
+                // 开启后立即在点击处画一次线,不必等下一次鼠标移动
+                if (DrawSWT.initMarkerPos(entry.getDrawSize(), pos)) {
+                    DrawSWT.drawMarker(x, y);
+                    getDiagram().redraw();
+                }
             } else {
                 data.setAngleMarkerEnable(enable);
             }
         }
+        updateMarkerCursor();
+    }
+
+    // 测量模式下画布光标变十字,关闭恢复默认
+    private void updateMarkerCursor()
+    {
+        Canvas c = getDiagram();
+        if (c == null || c.isDisposed())
+            return;
+        if (DrawSWT.isMarkerEnabled())
+            c.setCursor(c.getDisplay().getSystemCursor(SWT.CURSOR_CROSS));
+        else
+            c.setCursor(null);
     }
 
     static public void hideTip()
@@ -1856,9 +1989,9 @@ class ChartTab {
         group.setText(label);
         CTabItem item = TabManager.getTabItem(TabManager.SUB_FOLDER,
                 TabManager.BIRTH_TAB_ORDER);
+        // 图表页无组框,tab 名直接显示内容名(星曜及八字等)
         if (item != null)
-            item.setText(Resource.getString(tab_key));
-        desc_group[0].setText(Resource.getString(sub_tab_key));
+            item.setText(" " + Resource.getString(sub_tab_key).trim() + " ");
     }
 
     public void update(boolean add_entry, boolean preserve)
@@ -2264,12 +2397,21 @@ class ChartTab {
             tabs[DATA_TAB].setText(entry.getNote(true));
         }
 
+        // 缓存图像对应的画布逻辑尺寸(HiDPI 下图像为物理像素,
+        // 与画布逻辑尺寸不同,不能再用图像自身尺寸比较)
+        private Point last_size;
+
+        public void setLastSize(Point size)
+        {
+            last_size = size;
+        }
+
         public boolean sameSize(Image img, Point size)
         {
             if (img == null)
                 return false;
-            return img.getBounds().width == size.x
-                    && img.getBounds().height == size.y;
+            return last_size != null && last_size.x == size.x
+                    && last_size.y == size.y;
         }
 
         public void dispose()

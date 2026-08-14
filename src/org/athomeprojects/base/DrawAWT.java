@@ -110,6 +110,8 @@ public class DrawAWT {
 
 	private AffineTransform mark_tran;
 
+	private AffineTransform saved_transform;
+
 	static private class FontRecord {
 		private double width, height;
 
@@ -148,6 +150,16 @@ public class DrawAWT {
 
 	public AffineTransform getTransform() {
 		return g2d.getTransform();
+	}
+
+	// 保存/恢复变换状态(屏幕区域偏移绘制用)
+	public void saveTransform() {
+		saved_transform = g2d.getTransform();
+	}
+
+	public void restoreTransform() {
+		if (saved_transform != null)
+			g2d.setTransform(saved_transform);
 	}
 
 	public void setTransform(AffineTransform tran) {

@@ -22,6 +22,8 @@ import org.athomeprojects.base.Resource;
 import org.athomeprojects.swtext.ColorManager;
 import org.athomeprojects.swtext.ImageManager;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.ControlAdapter;
+import org.eclipse.swt.events.ControlEvent;
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseMoveListener;
@@ -31,9 +33,6 @@ import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FillLayout;
-import org.eclipse.swt.layout.FormAttachment;
-import org.eclipse.swt.layout.FormData;
-import org.eclipse.swt.layout.FormLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
@@ -53,7 +52,7 @@ public class CanvasUI extends Canvas implements MouseMoveListener {
 
 	private Button male, female;
 
-	private Label expand;
+	private Button expand;
 
 	private boolean pin_ui, show_ui, skip_overlay;
 
@@ -69,22 +68,22 @@ public class CanvasUI extends Canvas implements MouseMoveListener {
 		show_ui = Resource.getPrefInt("show_ui") != 0;
 		info_overlay = Resource.getPrefInt("info_overlay");
 		info_overlay_ratio = Resource.getPrefDouble("info_overlay_ratio");
-		setLayout(new FormLayout());
+		// GTK4 下 Canvas 的 FormLayout 布局失效(实测所有 FormData
+		// 子控件被摆在 (0,0),expand 图标跑到左上角、点击命中不了);
+		// 改为 resize 时手动 setBounds 摆位
 		button_composite = new Composite(this, SWT.NONE);
 		MenuFolder.addCommandListener(button_composite);
-		FormData form_data = new FormData();
-		form_data.top = new FormAttachment(0);
-		form_data.right = new FormAttachment(100);
-		button_composite.setLayoutData(form_data);
 		GridLayout grid_layout = new GridLayout(1, false);
 		grid_layout.marginWidth = grid_layout.marginHeight = 0;
 		button_composite.setLayout(grid_layout);
-		expand = new Label(button_composite, SWT.NONE);
+		// 现代交互:原作 13px 图标太不起眼,改为带文字的显眼按钮
+		expand = new Button(button_composite, SWT.PUSH);
 		updateColor(false);
-		ImageManager.setImageLabel(expand, "expand_icon");
+		expand.setImage(ImageManager.getImage("expand_icon"));
+		expand.setText(Resource.getString("input_button"));
 		expand.setToolTipText(Resource.getString("tip_expand_button"));
-		expand.addMouseListener(new MouseAdapter() {
-			public void mouseDown(MouseEvent event) {
+		expand.addSelectionListener(new SelectionAdapter() {
+			public void widgetSelected(SelectionEvent event) {
 				showUI();
 			}
 		});
@@ -93,47 +92,28 @@ public class CanvasUI extends Canvas implements MouseMoveListener {
 		grid_layout = new GridLayout(1, false);
 		grid_layout.marginWidth = grid_layout.marginHeight = grid_layout.verticalSpacing = 0;
 		entry_composite.setLayout(grid_layout);
-		form_data = new FormData();
-		form_data.top = new FormAttachment(0);
-		form_data.right = new FormAttachment(100);
-		entry_composite.setLayoutData(form_data);
 		entry_composite.setVisible(false);
 		trigger = 0;
 		Composite composite = new Composite(entry_composite, SWT.NONE);
 		composite.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-		composite.setLayout(new FormLayout());
-		Composite pin_container = new Composite(composite, SWT.NONE);
-		form_data = new FormData();
-		form_data.top = form_data.left = new FormAttachment(0);
-		pin_container.setLayoutData(form_data);
-		grid_layout = new GridLayout(1, false);
+		grid_layout = new GridLayout(2, false);
 		grid_layout.marginWidth = grid_layout.marginHeight = 0;
-		pin_container.setLayout(grid_layout);
-		Label pin = new Label(pin_container, SWT.NONE);
-		ImageManager.setImageLabel(pin, pin_ui ? "pindown_icon" : "pinup_icon");
-		pin.setToolTipText(Resource.getString("tip_pin_button"));
-		pin.addMouseListener(new MouseAdapter() {
-			public void mouseDown(MouseEvent event) {
-				Label label = (Label) event.getSource();
-				pin_ui = !pin_ui;
-				Resource.putPrefInt("pin_ui", pin_ui ? 1 : 0);
-				label.setImage(ImageManager.getImage(pin_ui ? "pindown_icon"
-						: "pinup_icon"));
-			}
-		});
+		composite.setLayout(grid_layout);
+
 		Composite shrink_container = new Composite(composite, SWT.NONE);
-		form_data = new FormData();
-		form_data.top = new FormAttachment(0);
-		form_data.right = new FormAttachment(100);
-		shrink_container.setLayoutData(form_data);
-		grid_layout = new GridLayout(1, false);
-		grid_layout.marginWidth = grid_layout.marginHeight = 0;
-		shrink_container.setLayout(grid_layout);
-		Label shrink = new Label(shrink_container, SWT.NONE);
-		ImageManager.setImageLabel(shrink, "shrink_icon");
+		GridData shrink_data = new GridData(GridData.FILL_HORIZONTAL
+				| GridData.HORIZONTAL_ALIGN_END);
+		shrink_container.setLayoutData(shrink_data);
+		GridLayout shrink_layout = new GridLayout(1, false);
+		shrink_layout.marginWidth = shrink_layout.marginHeight = 0;
+		shrink_container.setLayout(shrink_layout);
+		// GTK4 下 Label 的 mouseDown 不触发,隐藏按钮也改用 Button
+		Button shrink = new Button(shrink_container, SWT.PUSH);
+		shrink.setImage(ImageManager.getImage("shrink_icon"));
+		shrink.setText(Resource.getString("hide_input_button"));
 		shrink.setToolTipText(Resource.getString("tip_shrink_button"));
-		shrink.addMouseListener(new MouseAdapter() {
-			public void mouseDown(MouseEvent event) {
+		shrink.addSelectionListener(new SelectionAdapter() {
+			public void widgetSelected(SelectionEvent event) {
 				show_ui = false;
 				Resource.putPrefInt("show_ui", 0);
 				entry_composite.setVisible(false);
@@ -183,14 +163,31 @@ public class CanvasUI extends Canvas implements MouseMoveListener {
 		FillLayout fill_layout = new FillLayout();
 		fill_layout.marginWidth = fill_layout.marginHeight = fill_layout.spacing = 0;
 		info_composite.setLayout(fill_layout);
-		form_data = new FormData();
-		form_data.top = new FormAttachment(0);
-		form_data.left = new FormAttachment(0);
-		form_data.bottom = new FormAttachment(100);
-		info_composite.setLayoutData(form_data);
 		addMouseMoveListener(this);
 		info_composite.setVisible(false);
 		entry_composite.setVisible(show_ui);
+		addControlListener(new ControlAdapter() {
+			public void controlResized(ControlEvent event) {
+				layoutChildren();
+			}
+		});
+		layoutChildren();
+	}
+
+	// GTK4 下手动摆位(替代失效的 FormLayout):
+	// 按钮组(expand)在顶部中央——盘面圆外空白区,右上角会盖住八字环文字;
+	// 输入表格(entry)在右上角,展开时整片遮住盘面属预期;信息浮层占满画布
+	private void layoutChildren() {
+		if (isDisposed())
+			return;
+		Point size = getSize();
+		if (size.x <= 0 || size.y <= 0)
+			return;
+		Point bs = button_composite.computeSize(SWT.DEFAULT, SWT.DEFAULT);
+		button_composite.setBounds((size.x - bs.x) / 2, 0, bs.x, bs.y);
+		Point es = entry_composite.computeSize(SWT.DEFAULT, SWT.DEFAULT);
+		entry_composite.setBounds(size.x - es.x, 0, es.x, es.y);
+		info_composite.setBounds(0, 0, size.x, size.y);
 	}
 
 	public void hideInfo() {
@@ -214,17 +211,8 @@ public class CanvasUI extends Canvas implements MouseMoveListener {
 	}
 
 	public void mouseMove(MouseEvent event) {
-		if (show_ui && !pin_ui) {
-			Rectangle bounds = entry_composite.getBounds();
-			boolean visible = event.x >= trigger
-					&& bounds.contains(event.x, event.y);
-			if (entry_composite.getVisible() != visible) {
-				entry_composite.setVisible(visible);
-				button_composite.setVisible(!visible);
-				if (!visible)
-					button_composite.setFocus();
-			}
-		}
+		// 输入表格展开后常驻,不再随鼠标移出自动收起(原作行为是
+		// 「点开即闪没」的主要来源,现代交互改为显式收起)
 		if (info_overlay >= 0 && ChartTab.getTab(info_overlay).isTabVisible()) {
 			if (event.stateMask == SWT.CONTROL) {
 				skip_overlay = true;

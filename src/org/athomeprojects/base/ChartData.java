@@ -41,6 +41,26 @@ import java.util.StringTokenizer;
 import org.athomeprojects.swisseph.SweConst;
 
 public class ChartData {
+    // 屏幕显示的区域偏移(7 块文字区独立 x/y,仅窗口显示生效;导出
+    // PNG/SVG 前由 ImageControl 清零保持标准布局)。ChartTab 拖拽更新
+    // 并持久化。区号:0 左上描述 1 右上宫头表 2 左下星状态 3 左下命例
+    // 描述 4 左下描述 5 右下流年表 6 右下描述
+    static public int NUM_SCREEN_REGION = 7;
+
+    static public int[] screen_offset = new int[2 * NUM_SCREEN_REGION];
+
+    // 默认四角内缩边距(盘面半径约 3%,图内单位):区域默认偏移,
+    // 屏幕显示与导出共用;用户 Shift 拖动在此基础之上增量调整
+    static public int[] defaultRegionOffset()
+    {
+        int m = Resource.getInt("chart_reserve") + 380; // 约 12px 屏显
+        return new int[] { m, m, -m, m, m, -m * 2, m, -m, m, -m, -m, -m,
+                -m, -m };
+    }
+
+    // 各区域在页面内的参考锚点(图内坐标,拖拽命中检测用)
+    static public java.awt.Point[] region_anchors = new java.awt.Point[NUM_SCREEN_REGION];
+
     static public final int SUN = 0;
 
     static public final int MOON = 1;
@@ -2460,21 +2480,59 @@ public class ChartData {
         draw.setForeground(Resource.getPrefInt("chart_base_ring_fg_color"));
         draw.setColor();
         int mode = ChartMode.getChartMode();
+        // 各区域参考锚点(图内坐标):鼠标命中检测用
+        region_anchors[0] = new java.awt.Point(0, 0);
+        region_anchors[1] = new java.awt.Point(trim_page_size.x, 0);
+        region_anchors[2] = new java.awt.Point(0, trim_page_size.y / 2);
+        region_anchors[3] = new java.awt.Point(0, trim_page_size.y * 3 / 4);
+        region_anchors[4] = new java.awt.Point(0, trim_page_size.y);
+        region_anchors[5] = new java.awt.Point(trim_page_size.x,
+                trim_page_size.y / 2);
+        region_anchors[6] = new java.awt.Point(trim_page_size.x,
+                trim_page_size.y);
         if (!chart_only) {
+            // 5 右下流年/神煞表
+            draw.saveTransform();
+            draw.translate(screen_offset[10], screen_offset[11]);
             int height = showDescLowerRightPage(draw, mode, trim_page_size,
                     diagram_size);
+            draw.restoreTransform();
+            // 2 左下星曜状态表
+            draw.saveTransform();
+            draw.translate(screen_offset[4], screen_offset[5]);
             int num_row = showDescSign(draw, prefix, mode, trim_page_size,
                     diagram_size, height, applet, use_bw);
+            draw.restoreTransform();
+            // 3 左下命例描述
+            draw.saveTransform();
+            draw.translate(screen_offset[6], screen_offset[7]);
             showDescNameDesc(draw, mode, year_info, trim_page_size,
                     diagram_size, show_now && num_row > NUM_ROW_THRESHOLD);
+            draw.restoreTransform();
         }
+        // 4 左下描述
+        draw.saveTransform();
+        draw.translate(screen_offset[8], screen_offset[9]);
         showDescLowerLeft(draw, mode, trim_page_size, diagram_size, applet);
+        draw.restoreTransform();
+        // 6 右下描述
+        draw.saveTransform();
+        draw.translate(screen_offset[12], screen_offset[13]);
         showDescLowerRight(draw, mode, trim_page_size, diagram_size, applet,
                 chart_only && !show_horiz);
+        draw.restoreTransform();
+        // 0 左上描述
+        draw.saveTransform();
+        draw.translate(screen_offset[0], screen_offset[1]);
         showDescUpperLeft(draw, mode, trim_page_size, diagram_size, applet,
                 chart_only);
+        draw.restoreTransform();
+        // 1 右上宫头表
+        draw.saveTransform();
+        draw.translate(screen_offset[2], screen_offset[3]);
         showDescUpperRight(draw, prefix, mode, trim_page_size, diagram_size,
                 applet, use_bw);
+        draw.restoreTransform();
         if (footnote)
             showDescFootNote(draw, page_size, diagram_size, applet || pic, 0);
         draw.setForeground();
@@ -2597,11 +2655,14 @@ public class ChartData {
                                     (String) aspects[0], x, y,
                                     (String) aspects[1], colors, i == 0);
                             int height = draw.getFontHeight();
-                            x = page_size.x - dim.x - height - l_dim.x;
+                            // 右上八字(NameDesc)竖排占右缘约 2 字宽,
+                            // 表向左让位避免重叠
+                            x = page_size.x - dim.x - height - 2 * l_dim.x
+                                    - t_dim.x / 2;
                             int n_x = Math.max(diagram_size.x + t_dim.x, c_x
                                     - dim.x / 2);
                             x = Math.min(x, n_x);
-                            y = 2 * height;
+                            y = 2 * height + height / 2;
                         }
                         int asc_color = draw.getColor("chart_asc_mk_color",
                                 use_bw);
@@ -5987,6 +6048,9 @@ public class ChartData {
                         !birth_data);
             }
         }
+        // 文本填充完成,应用自动着色(干支五行/十神/标签/度数)
+        tab.applyAutoStyle();
+        pole_tab.applyAutoStyle();
     }
 
     private void showCuspData(double[] cusp, String[] name)
