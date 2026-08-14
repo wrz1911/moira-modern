@@ -2,5 +2,3 @@ out/
 .claude/
 *.log
 .idea/workspace.xml
-help/
-readme.html
