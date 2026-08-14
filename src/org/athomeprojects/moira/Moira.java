@@ -833,6 +833,15 @@ public class Moira {
 				setShellState();
 				chart_tab.setSashWeights();
 				chart_tab.layout(true);
+				// Linux 首次启动布局竞态:右侧「出生年月日时及地点」组可能
+				// 盖住城市选择等子控件(切换 UI 模式后自愈);窗口显示后
+				// 再强制一次整窗布局,消除初始重叠
+				display.asyncExec(new Runnable() {
+					public void run() {
+						if (shell != null && !shell.isDisposed())
+							shell.layout(true, true);
+					}
+				});
 				shell.addShellListener(new ShellListener() {
 					public void shellClosed(ShellEvent e) {
 						ChartTab.hideTip();

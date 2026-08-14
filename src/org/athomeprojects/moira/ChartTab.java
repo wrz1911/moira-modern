@@ -147,7 +147,9 @@ class ChartTab {
 
     private CanvasUI ui_diagram;
 
-    private Composite top, combo, lr_combo;
+    private Composite top, combo;
+
+    private SashForm lr_combo;
 
     private StackLayout top_layout;
 
@@ -158,6 +160,10 @@ class ChartTab {
     private MenuItem[] toggle_menu_item;
 
     private boolean in_drag, reset_draw;
+
+    private int min_right_width;
+
+    private boolean in_sash_fix;
 
     private DiagramTip drag_tip;
 
@@ -184,8 +190,9 @@ class ChartTab {
                 setSashWeights();
             }
         });
-        lr_combo = new Composite(dock_sash, SWT.NONE);
-        lr_combo.setLayout(new GridLayout(2, false));
+        // 左右可拖动分栏:左侧排盘区 / 右侧信息输入与显示,默认 70:30
+        // 非均等(SashForm 拖动后自动保持比例)
+        lr_combo = new SashForm(dock_sash, SWT.HORIZONTAL);
         lr_combo.addListener(SWT.Resize, new Listener() {
             public void handleEvent(Event e)
             {
@@ -193,7 +200,6 @@ class ChartTab {
             }
         });
         user_group = new Group(lr_combo, SWT.NONE);
-        user_group.setLayoutData(new GridData(GridData.FILL_VERTICAL));
         user_group.setLayout(new FillLayout());
         final ScrolledComposite diagram_scroll = new ScrolledComposite(
                 user_group, SWT.H_SCROLL | SWT.V_SCROLL);
@@ -213,10 +219,21 @@ class ChartTab {
         ui_diagram = new CanvasUI(ui_group, SWT.NO_BACKGROUND | SWT.BORDER);
         addDiagramListener(ui_diagram);
         top_composite = new Composite(lr_combo, SWT.NONE);
-        top_composite.setLayoutData(new GridData(GridData.FILL_BOTH));
         GridLayout grid_layout = new GridLayout(1, false);
         grid_layout.marginWidth = grid_layout.marginHeight = 0;
         top_composite.setLayout(grid_layout);
+        lr_combo.setWeights(new int[] { 70, 30 });
+        // dock_sash 为垂直 SashForm,未设 weights 时按子控件 natural 高度
+        // 分配(实测 lr_combo 被压扁,右侧各组上下压缩);显式让其占满。
+        // 构建期直接 setWeights 会触发未完成布局导致 GTK 原生层崩溃,
+        // 改为布局完成后异步设置
+        top_composite.getDisplay().asyncExec(new Runnable() {
+            public void run()
+            {
+                if (dock_sash != null && !dock_sash.isDisposed())
+                    dock_sash.setWeights(new int[] { 100 });
+            }
+        });
         ctrl_composite = new Composite(top_composite, SWT.NONE);
         grid_layout = new GridLayout(1, false);
         grid_layout.marginWidth = grid_layout.marginHeight = 0;
@@ -368,6 +385,7 @@ class ChartTab {
                     addNowControl(false);
                 break;
         }
+        initSashMinWidth();
         updateAdjNorth(null);
         sub_folder.setSelection(0);
         BaseCalendar.setDstAdjust(Resource.getPrefInt("dst_adjust") != 0);
@@ -1985,14 +2003,71 @@ class ChartTab {
         Moira.getShell().setVisible(true);
     }
 
+    // 右侧区宽度边界保护:不得窄于日期组(含「更新星盘」按钮)与流年框
+    // 的完整显示宽度,也不得宽于总宽的 50%;拖动结束后延迟修正,
+    // 避免拖动过程中 setWeights 破坏 sash 手柄
+    private void initSashMinWidth()
+    {
+        top_composite.addListener(SWT.Resize, new Listener() {
+            public void handleEvent(Event e)
+            {
+                if (in_sash_fix)
+                    return;
+                final Display display = top_composite.getDisplay();
+                display.timerExec(250, new Runnable() {
+                    public void run() {
+                        fixRightWidth();
+                    }
+                });
+            }
+        });
+        // 布局完成后计算最小宽度(日期组与流年组需求的较大者)
+        top_composite.getDisplay().asyncExec(new Runnable() {
+            public void run()
+            {
+                if (top_composite.isDisposed() || group == null
+                        || group.isDisposed())
+                    return;
+                int w = group.computeSize(SWT.DEFAULT, SWT.DEFAULT).x;
+                if (now_group != null && !now_group.isDisposed())
+                    w = Math.max(w, now_group.computeSize(SWT.DEFAULT,
+                            SWT.DEFAULT).x);
+                min_right_width = w + 16;
+                fixRightWidth();
+            }
+        });
+    }
+
+    private void fixRightWidth()
+    {
+        if (in_sash_fix || min_right_width <= 0 || lr_combo == null
+                || lr_combo.isDisposed() || top_composite.isDisposed())
+            return;
+        int total = lr_combo.getSize().x;
+        if (total <= 0)
+            return;
+        int right = top_composite.getSize().x;
+        int target = right;
+        if (target < min_right_width)
+            target = min_right_width;
+        if (target > total / 2)
+            target = total / 2;
+        if (target != right) {
+            in_sash_fix = true;
+            lr_combo.setWeights(new int[] {
+                    Math.max(0, total - lr_combo.SASH_WIDTH - target),
+                    target });
+            lr_combo.layout(true, true);
+            lr_combo.redraw();
+            in_sash_fix = false;
+        }
+    }
+
     public void layout(boolean force)
     {
-        Point size = user_group.getSize();
-        GridData grid_data = (GridData) user_group.getLayoutData();
-        if (force || grid_data.widthHint != size.y) {
-            grid_data.widthHint = size.y;
-            lr_combo.layout();
-        }
+        // lr_combo 已改为 SashForm 分栏(可拖动),不再用 GridData 锁定
+        // 星盘区域正方形;星盘图自适应分栏宽度,居中绘制
+        lr_combo.layout();
     }
 
     private void moveEntryField(Composite parent)
