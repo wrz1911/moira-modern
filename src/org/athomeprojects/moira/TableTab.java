@@ -38,23 +38,26 @@ import org.athomeprojects.swtext.LocationSpinner;
 import org.eclipse.jface.window.Window;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabFolder;
-import org.eclipse.swt.custom.TableEditor;
-import org.eclipse.swt.events.ControlAdapter;
-import org.eclipse.swt.events.ControlEvent;
+import org.eclipse.swt.custom.SashForm;
+
+
+
 import org.eclipse.swt.events.FocusAdapter;
+import org.eclipse.swt.events.KeyAdapter;
+import org.eclipse.swt.events.KeyEvent;
 import org.eclipse.swt.events.FocusEvent;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
+
+
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
-import org.eclipse.swt.events.MouseMoveListener;
-import org.eclipse.swt.events.MouseTrackAdapter;
-import org.eclipse.swt.events.PaintEvent;
-import org.eclipse.swt.events.PaintListener;
+
+
+
+
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.events.TraverseEvent;
-import org.eclipse.swt.events.TraverseListener;
+
+
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.GC;
@@ -63,6 +66,7 @@ import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.layout.RowLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
@@ -70,10 +74,10 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.List;
 import org.eclipse.swt.widgets.Listener;
-import org.eclipse.swt.widgets.Table;
-import org.eclipse.swt.widgets.TableColumn;
-import org.eclipse.swt.widgets.TableItem;
+
+
 import org.eclipse.swt.widgets.Text;
 
 class TableTab {
@@ -81,21 +85,7 @@ class TableTab {
 
     private final int SHORT_DESC_LENGTH = 30;
 
-    private final int TEXT_PADDING = 15;
-
-    private final int CHECK_WIDTH = 20;
-
-    private final int SELECT_WIDTH = 20;
-
-    private final int REMOVE_WARN = 5;
-
-    private final int CHECK = 0;
-
-    private final int SELECT = 1;
-
     private final int NAME = 2;
-
-    private final int SEX = 3;
 
     private final int DATE = 4;
 
@@ -105,60 +95,29 @@ class TableTab {
 
     private final int BIRTHPLACE = 5;
 
-    private final int MOUNTAIN = 6;
-
     private final int DATA_NOTE = 6;
-
-    private final int DAYSET = 7;
 
     private final int PICK_NOTE = 8;
 
     private int date_index, place_index, note_index;
 
-    private GC gc;
-
-    private Table table;
-
-    private TableEditor field_editor;
-
-    private TableEditor[] check_editor, select_editor;
-
-    private Text text_field, place_field;
-
-    private Button place_button;
-
-    private Label label_field;
-
     private Font font;
-
-    private Color bg_color, odd_row_bg_color, hilite_bg_color;
 
     private Group group;
 
     private Composite container, bottom_container, relationship,
-            desc_container, place_container;
+            desc_container, detail_container;
+    private SashForm list_area;
 
     private Combo chart_type;
 
     private DataTab desc;
-
-    private Text footer, label;
 
     private Button open, add, save, save_as, show, hide;
 
     private String group_name, male, female, day_choice, night_choice;
 
     private boolean name_up, place_up, birthday_up, has_both_set, need_save;
-
-    private boolean resize_in_progress, resize_pending;
-
-    private Point last_table_size;
-
-    private String[][] column_label;
-
-    private int[][] column_align;
-
-    private TableColumn[] column;
 
     private Entry[] row;
 
@@ -168,10 +127,24 @@ class TableTab {
 
     private int[] num_row;
 
-    private int type, update_depth, top_index, edit_row, edit_col, find_row,
-            num_visible_row;
+    private int type, update_depth, top_index, find_row;
 
     private String edit_text;
+
+    // Master-Detail 列表 UI:左侧命例列表 + 右侧详情表单
+    private List entry_list;
+
+    private Text name_field, birthday_field, place_field, note_field,
+            mountain_field, zone_field;
+
+    private Combo sex_combo, dayset_combo;
+
+    private Button update_check, place_button, note_save;
+
+    private Label detail_title, label, mountain_label,
+            dayset_label;
+
+    private int last_selected_index = -1;
 
     public Composite createTabFolderPage(CTabFolder tab_folder)
     {
@@ -188,285 +161,124 @@ class TableTab {
         group_name = "";
         group.setLayout(new FillLayout());
         container = new Composite(group, SWT.NONE);
-        container.setLayout(new GridLayout(1, false));
-        container.addPaintListener(new PaintListener() {
-            public void paintControl(PaintEvent event)
-            {
-                if (!table.isEnabled()) {
-                    edit_row = edit_col = -1;
-                    table.setRedraw(false);
-                    if (top_index >= 0 && top_index < table.getItemCount()) {
-                        showEntry(top_index, false);
-                        top_index = -1;
-                    }
-                    hideField();
-                    table.setEnabled(true);
-                    setColumnSize();
-                    setButtonEditors(false);
-                    boolean visible = num_visible_row > num_row[type];
-                    if (table.getLinesVisible() != visible)
-                        table.setLinesVisible(visible);
-                    table.update();
-                    table.setRedraw(true);
-                }
-                container.layout();
-            }
-        });
-        table = new Table(container, SWT.MULTI | SWT.VIRTUAL | SWT.BORDER
-                | SWT.FULL_SELECTION | SWT.HIDE_SELECTION);
-        table.setLayoutData(new GridData(GridData.FILL_HORIZONTAL
+        GridLayout container_layout = new GridLayout(1, false);
+        container_layout.marginWidth = container_layout.marginHeight = 0;
+        container.setLayout(container_layout);
+
+        // Master-Detail 主区:左命例列表 + 右详情表单(可拖动分栏)
+        list_area = new SashForm(container, SWT.HORIZONTAL);
+        list_area.setLayoutData(new GridData(GridData.FILL_HORIZONTAL
                 | GridData.FILL_VERTICAL));
-        table.setHeaderVisible(true);
-        table.setLinesVisible(true);
-        table.setEnabled(false);
-        Moira.addFocusListener(table);
-        table.addListener(SWT.SetData, new Listener() {
-            public void handleEvent(Event event)
-            {
-                TableItem item = (TableItem) event.item;
-                int index = table.indexOf(item);
-                Entry entry = row[index];
-                if (entry == null || entry.item != null)
-                    return;
-                entry.initEntry(item, (index % 2) == 1);
-                setColumnSize();
-            }
-        });
-        table.addControlListener(new ControlAdapter() {
-            public void controlResized(ControlEvent event)
-            {
-                // GTK4 下异步尺寸分配会反复发送 resize 事件,尺寸未变时跳过;
-                // 且 getClientArea 会触发 forceResize→layout→setBounds 同步
-                // 重入,须防重入避免栈溢出
-                Point size = table.getSize();
-                if (size.equals(last_table_size))
-                    return;
-                last_table_size = size;
-                if (resize_in_progress) {
-                    resize_pending = true;
-                    return;
-                }
-                resize_in_progress = true;
-                do {
-                    resize_pending = false;
-                    setButtonEditors(true);
-                    update();
-                } while (resize_pending);
-                resize_in_progress = false;
-            }
-        });
-        place_container = new Composite(table, SWT.NONE);
-        GridLayout grid_layout = new GridLayout(2, false);
-        grid_layout.marginWidth = grid_layout.marginHeight = 0;
-        place_container.setLayout(grid_layout);
-        place_button = new Button(place_container, SWT.ARROW | SWT.DOWN);
-        place_button.setLayoutData(new GridData(GridData.FILL_VERTICAL));
-        place_button.addFocusListener(new FocusAdapter() {
-            public void focusLost(FocusEvent event)
-            {
-                if (!inPlaceContainer())
-                    place_container.setVisible(false);
-            }
-        });
-        place_button.addSelectionListener(new SelectionAdapter() {
+
+        // 左侧:排序按钮行 + 命例列表
+        Composite list_panel = new Composite(list_area, SWT.NONE);
+        list_panel.setLayoutData(new GridData(GridData.FILL_BOTH));
+        GridLayout list_panel_layout = new GridLayout(1, false);
+        list_panel_layout.marginWidth = list_panel_layout.marginHeight = 0;
+        list_panel.setLayout(list_panel_layout);
+        Composite sort_bar = new Composite(list_panel, SWT.NONE);
+        sort_bar.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        sort_bar.setLayout(new RowLayout());
+        Button sort_name = new Button(sort_bar, SWT.PUSH);
+        sort_name.setText(Resource.getString("table_column_label")
+                .split(",")[NAME].replaceAll("x", "") + " ↑");
+        sort_name.setToolTipText(Resource.getString("tip_sort_name"));
+        Moira.addFocusListener(sort_name);
+        sort_name.addSelectionListener(new SelectionAdapter() {
             public void widgetSelected(SelectionEvent event)
             {
-                if (edit_row < 0 || edit_row >= num_row[type])
-                    return;
-                edit_text = place_field.getText();
-                LocationSpinner loc = Moira.getChart().getSpinner();
-                String country = loc.getCountryName();
-                String city = loc.getCityName();
-                String zone = loc.getZoneName();
-                DataEntry entry = row_data[type][edit_row];
-                loc.setCountryName(entry.getCountry());
-                loc.setCityName(entry.getCity());
-                loc.setZoneName(entry.getZone());
-                (new LocationDialog(Moira.getShell())).open();
-                String new_country = loc.getCountryName();
-                String new_city = loc.getCityName();
-                String new_zone = loc.getZoneName();
-                String new_place = new_city + ", " + new_country;
-                place_field.setText(new_place);
-                if (!new_place.equals(edit_text)) {
-                    entry.setCountry(new_country);
-                    entry.setCity(new_city);
-                    entry.setZone(new_zone);
-                    need_save = true;
-                }
-                loc.setCountryName(country);
-                loc.setCityName(city);
-                loc.setZoneName(zone);
+                sortName();
             }
         });
-        place_field = new Text(place_container, SWT.LEFT);
-        place_field.setLayoutData(new GridData(GridData.FILL_BOTH));
-        place_field.addModifyListener(new ModifyListener() {
-            public void modifyText(ModifyEvent event)
-            {
-                if (edit_row >= 0 && edit_row < num_row[type] && edit_col >= 0
-                        && edit_col < table.getColumnCount()) {
-                    field_editor.getItem().setText(edit_col,
-                            place_field.getText());
-                    row[edit_row].updateEntry();
-                }
-            }
-        });
-        place_field.addFocusListener(new FocusAdapter() {
-            public void focusLost(FocusEvent event)
-            {
-                if (!inPlaceContainer()) {
-                    place_container.setVisible(false);
-                    String new_place = place_field.getText();
-                    if (!new_place.equals(edit_text))
-                        need_save = true;
-                }
-            }
-        });
-        place_field.addTraverseListener(new TraverseListener() {
-            public void keyTraversed(TraverseEvent event)
-            {
-                switch (event.detail) {
-                    case SWT.TRAVERSE_TAB_NEXT:
-                    case SWT.TRAVERSE_TAB_PREVIOUS:
-                        hideField();
-                        setEditField((event.detail == SWT.TRAVERSE_TAB_NEXT) ? 1
-                                : -1);
-                        event.doit = false;
-                        break;
-                }
-            }
-        });
-        text_field = new Text(table, SWT.LEFT);
-        text_field.addModifyListener(new ModifyListener() {
-            public void modifyText(ModifyEvent event)
-            {
-                if (edit_row >= 0 && edit_row < num_row[type] && edit_col >= 0
-                        && edit_col < table.getColumnCount()) {
-                    field_editor.getItem().setText(edit_col,
-                            text_field.getText());
-                    row[edit_row].updateEntry();
-                }
-            }
-        });
-        text_field.addFocusListener(new FocusAdapter() {
-            public void focusLost(FocusEvent event)
-            {
-                text_field.setVisible(false);
-                String new_text = text_field.getText();
-                if (!new_text.equals(edit_text))
-                    need_save = true;
-            }
-        });
-        text_field.addTraverseListener(new TraverseListener() {
-            public void keyTraversed(TraverseEvent event)
-            {
-                switch (event.detail) {
-                    case SWT.TRAVERSE_TAB_NEXT:
-                    case SWT.TRAVERSE_TAB_PREVIOUS:
-                        hideField();
-                        setEditField((event.detail == SWT.TRAVERSE_TAB_NEXT) ? 1
-                                : -1);
-                        event.doit = false;
-                        break;
-                }
-            }
-        });
-        label_field = new Label(table, SWT.LEFT);
-        label_field.addFocusListener(new FocusAdapter() {
-            public void focusLost(FocusEvent event)
-            {
-                label_field.setVisible(false);
-            }
-        });
-        label_field.addMouseTrackListener(new MouseTrackAdapter() {
-            public void mouseExit(MouseEvent event)
-            {
-                label_field.setVisible(false);
-            }
-        });
-        desc = new DataTab();
-        desc_container = desc.createDataPage(TabManager.getPlaceHolder(), "",
-                "table", false, true, false, false, true);
-        field_editor = new TableEditor(table);
-        field_editor.grabHorizontal = true;
-        field_editor.horizontalAlignment = SWT.LEFT;
-        table.addMouseListener(new MouseAdapter() {
-            public void mouseDown(MouseEvent event)
-            {
-                Point pt = new Point(event.x, event.y);
-                TableItem item = table.getItem(pt);
-                if (item == null)
-                    return;
-                edit_row = -1;
-                for (edit_col = NAME; edit_col < note_index; edit_col++) {
-                    Rectangle rect = item.getBounds(edit_col);
-                    if (rect.contains(pt)) {
-                        edit_row = table.indexOf(item);
-                        setEditField(0);
-                        return;
-                    }
-                }
-                table.deselectAll();
-            }
-        });
-        table.addMouseMoveListener(new MouseMoveListener() {
-            public void mouseMove(MouseEvent event)
-            {
-                Point pt = new Point(event.x, event.y);
-                TableItem item = table.getItem(pt);
-                if (item == null)
-                    return;
-                Rectangle rect = item.getBounds(note_index);
-                if (!rect.contains(pt))
-                    return;
-                place_container.setVisible(false);
-                text_field.setVisible(false);
-                String s = item.getText(note_index);
-                if (s.equals(""))
-                    return;
-                edit_row = -1;
-                int width = column[note_index].getWidth();
-                if (gc.textExtent(s).x > width) {
-                    for (int i = s.length() - 1; i >= 0; i--) {
-                        String str = s.substring(0, i) + "...";
-                        if (gc.textExtent(str).x <= width) {
-                            s = str;
-                            break;
-                        }
-                    }
-                }
-                label_field.setText(s);
-                field_editor.setEditor(label_field, item, note_index);
-                label_field.setBackground(item.getBackground());
-                Entry entry = row[table.indexOf(item)];
-                label_field.setToolTipText(entry.entry.getNote(false));
-                label_field.setVisible(true);
-                label_field.setFocus();
-            }
-        });
-        table.getVerticalBar().addSelectionListener(new SelectionAdapter() {
+        Button sort_place = new Button(sort_bar, SWT.PUSH);
+        sort_place.setText(Resource.getString("table_column_label")
+                .split(",")[BIRTHPLACE].replaceAll("x", "") + " ↑");
+        sort_place.setToolTipText(Resource.getString("tip_sort_place"));
+        Moira.addFocusListener(sort_place);
+        sort_place.addSelectionListener(new SelectionAdapter() {
             public void widgetSelected(SelectionEvent event)
             {
-                setButtonEditors(false);
+                sortPlace();
             }
         });
-        column_label = new String[DataSet.MAX_TYPE][];
-        column_label[DataSet.DATA] = Resource
-                .getStringArray("table_column_label");
-        column_label[DataSet.PICK] = Resource
-                .getStringArray("pick_table_column_label");
-        column_align = new int[DataSet.MAX_TYPE][];
-        column_align[DataSet.DATA] = Resource.getIntArray("table_column_align");
-        column_align[DataSet.PICK] = Resource
-                .getIntArray("pick_table_column_align");
-        column = null;
-        setColumn();
-        gc = new GC(table);
-        bottom_container = new Composite(container, SWT.NO_FOCUS);
-        bottom_container.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-        bottom_container.setLayout(new GridLayout(12, false));
-        open = new Button(bottom_container, SWT.PUSH);
+        Button sort_day = new Button(sort_bar, SWT.PUSH);
+        sort_day.setText(Resource.getString("table_column_label")
+                .split(",")[BIRTHDAY].replaceAll("x", "") + " ↑");
+        sort_day.setToolTipText(Resource.getString("tip_sort_day"));
+        Moira.addFocusListener(sort_day);
+        sort_day.addSelectionListener(new SelectionAdapter() {
+            public void widgetSelected(SelectionEvent event)
+            {
+                sortDay();
+            }
+        });
+        Label legend = new Label(sort_bar, SWT.NONE);
+        legend.setText(Resource.getString("list_legend"));
+        legend.setForeground(Display.getCurrent().getSystemColor(
+                SWT.COLOR_TITLE_INACTIVE_FOREGROUND));
+        label = new Label(sort_bar, SWT.NONE);
+        label.setForeground(Display.getCurrent().getSystemColor(
+                SWT.COLOR_TITLE_INACTIVE_FOREGROUND));
+        entry_list = new List(list_panel, SWT.BORDER | SWT.V_SCROLL
+                | SWT.SINGLE);
+        entry_list.setLayoutData(new GridData(GridData.FILL_BOTH));
+        Moira.addFocusListener(entry_list);
+        // 单击选中命例并排盘(与原表格单选列行为一致)
+        entry_list.addSelectionListener(new SelectionAdapter() {
+            public void widgetSelected(SelectionEvent event)
+            {
+                selectListEntry();
+            }
+        });
+        // 回车:保存详情修改并立即排盘(与「更新」按钮一致)
+        entry_list.addKeyListener(new KeyAdapter() {
+            public void keyPressed(KeyEvent event)
+            {
+                if (event.keyCode == '\r' || event.keyCode == '\n') {
+                    saveDetail();
+                    updateChart(true);
+                    Moira.getChart().resetCities();
+                }
+            }
+        });
+        // 双击切换勾选状态
+        entry_list.addMouseListener(new MouseAdapter() {
+            public void mouseDoubleClick(MouseEvent event)
+            {
+                int index = entry_list.getSelectionIndex();
+                if (index < 0 || index >= num_row[type])
+                    return;
+                row_data[type][index].setSelected(!row_data[type][index]
+                        .getSelected());
+                need_save = true;
+                refreshList();
+                entry_list.setSelection(index);
+                showDetail(index);
+            }
+        });
+
+        // 右侧:详情表单
+        detail_container = new Composite(list_area, SWT.NONE);
+        detail_container.setLayoutData(new GridData(GridData.FILL_BOTH));
+        GridLayout detail_layout = new GridLayout(2, false);
+        detail_layout.marginWidth = 8;
+        detail_layout.marginHeight = 4;
+        detail_container.setLayout(detail_layout);
+        detail_title = new Label(detail_container, SWT.NONE);
+        detail_title.setLayoutData(new GridData(GridData.FILL_HORIZONTAL
+                | GridData.HORIZONTAL_ALIGN_CENTER));
+        detail_title.setText(Resource.getString("detail_title"));
+        GridData title_data = (GridData) detail_title.getLayoutData();
+        title_data.horizontalSpan = 2;
+        // 按钮行:文件操作组 | 编辑操作组
+        Composite button_bar = new Composite(detail_container, SWT.NONE);
+        GridData bar_data = new GridData(GridData.FILL_HORIZONTAL);
+        bar_data.horizontalSpan = 2;
+        button_bar.setLayoutData(bar_data);
+        RowLayout bar_layout = new RowLayout();
+        bar_layout.marginTop = bar_layout.marginBottom = 2;
+        button_bar.setLayout(bar_layout);
+        open = new Button(button_bar, SWT.PUSH);
         open.setText(Resource.getString("open_button"));
         open.setToolTipText(Resource.getString("tip_open_button"));
         Moira.addFocusListener(open);
@@ -476,7 +288,7 @@ class TableTab {
                 openFile();
             }
         });
-        add = new Button(bottom_container, SWT.PUSH);
+        add = new Button(button_bar, SWT.PUSH);
         add.setText(Resource.getString("add_button"));
         add.setToolTipText(Resource.getString("tip_add_button"));
         Moira.addFocusListener(add);
@@ -486,7 +298,7 @@ class TableTab {
                 openFile(true, false, true, null);
             }
         });
-        save = new Button(bottom_container, SWT.PUSH);
+        save = new Button(button_bar, SWT.PUSH);
         save.setText(Resource.getString("save_button"));
         save.setToolTipText(Resource.getString("tip_save_button"));
         Moira.addFocusListener(save);
@@ -496,7 +308,7 @@ class TableTab {
                 saveFile(null, true);
             }
         });
-        save_as = new Button(bottom_container, SWT.PUSH);
+        save_as = new Button(button_bar, SWT.PUSH);
         save_as.setText(Resource.getString("save_as_button"));
         save_as.setToolTipText(Resource.getString("tip_save_as_button"));
         Moira.addFocusListener(save_as);
@@ -506,27 +318,9 @@ class TableTab {
                 saveFile(null, false);
             }
         });
-        Button up = new Button(bottom_container, SWT.ARROW | SWT.UP);
-        up.setLayoutData(new GridData(GridData.FILL_VERTICAL));
-        up.setToolTipText(Resource.getString("tip_up_button"));
-        Moira.addFocusListener(up);
-        up.addSelectionListener(new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event)
-            {
-                moveSelection(type, true, false, true);
-            }
-        });
-        Button down = new Button(bottom_container, SWT.ARROW | SWT.DOWN);
-        down.setLayoutData(new GridData(GridData.FILL_VERTICAL));
-        down.setToolTipText(Resource.getString("tip_down_button"));
-        Moira.addFocusListener(down);
-        down.addSelectionListener(new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event)
-            {
-                moveSelection(type, false, false, true);
-            }
-        });
-        Button blank = new Button(bottom_container, SWT.PUSH);
+        Label sep1 = new Label(button_bar, SWT.NONE);
+        sep1.setText("|");
+        Button blank = new Button(button_bar, SWT.PUSH);
         blank.setText(Resource.getString("new_button"));
         blank.setToolTipText(Resource.getString("tip_new_button"));
         Moira.addFocusListener(blank);
@@ -536,7 +330,7 @@ class TableTab {
                 newEntry();
             }
         });
-        Button remove = new Button(bottom_container, SWT.PUSH);
+        Button remove = new Button(button_bar, SWT.PUSH);
         remove.setText(Resource.getString("remove_button"));
         remove.setToolTipText(Resource.getString("tip_remove_button"));
         Moira.addFocusListener(remove);
@@ -546,7 +340,7 @@ class TableTab {
                 removeSelection(true);
             }
         });
-        Button update = new Button(bottom_container, SWT.PUSH);
+        Button update = new Button(button_bar, SWT.PUSH);
         update.setText(Resource.getString("update_button"));
         update.setToolTipText(Resource.getString("tip_update_button"));
         Moira.addFocusListener(update);
@@ -557,7 +351,201 @@ class TableTab {
                 Moira.getChart().resetCities();
             }
         });
-        relationship = new Composite(TabManager.getPlaceHolder(), SWT.NONE);
+        Label name_label = new Label(detail_container, SWT.RIGHT);
+        name_label.setText(Resource.getString("name_label"));
+        GridData nl_data = new GridData();
+        nl_data.widthHint = 70;
+        name_label.setLayoutData(nl_data);
+        name_field = new Text(detail_container, SWT.BORDER);
+        name_field.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        Moira.addFocusListener(name_field);
+        name_field.addFocusListener(new FocusAdapter() {
+            public void focusLost(FocusEvent event)
+            {
+                saveDetail();
+            }
+        });
+        Label sex_label = new Label(detail_container, SWT.RIGHT);
+        sex_label.setText(Resource.getString("sex_label"));
+        GridData sl_data = new GridData();
+        sl_data.widthHint = 70;
+        sex_label.setLayoutData(sl_data);
+        sex_combo = new Combo(detail_container, SWT.DROP_DOWN
+                | SWT.READ_ONLY);
+        sex_combo.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        sex_combo.add(Resource.getString("male"));
+        sex_combo.add(Resource.getString("female"));
+        Moira.addFocusListener(sex_combo);
+        sex_combo.addSelectionListener(new SelectionAdapter() {
+            public void widgetSelected(SelectionEvent event)
+            {
+                saveDetail();
+            }
+        });
+        Label birthday_label = new Label(detail_container, SWT.RIGHT);
+        birthday_label.setText(Resource.getString("birthday_label"));
+        GridData bl_data = new GridData();
+        bl_data.widthHint = 70;
+        birthday_label.setLayoutData(bl_data);
+        birthday_field = new Text(detail_container, SWT.BORDER);
+        birthday_field.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        Moira.addFocusListener(birthday_field);
+        birthday_field.addFocusListener(new FocusAdapter() {
+            public void focusLost(FocusEvent event)
+            {
+                saveDetail();
+            }
+        });
+        Label place_label = new Label(detail_container, SWT.RIGHT);
+        place_label.setText(Resource.getString("place_label"));
+        GridData pl_data = new GridData();
+        pl_data.widthHint = 70;
+        place_label.setLayoutData(pl_data);
+        Composite place_row = new Composite(detail_container, SWT.NONE);
+        place_row.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        GridLayout place_row_layout = new GridLayout(2, false);
+        place_row_layout.marginWidth = place_row_layout.marginHeight = 0;
+        place_row.setLayout(place_row_layout);
+        place_field = new Text(place_row, SWT.BORDER);
+        place_field.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        Moira.addFocusListener(place_field);
+        place_field.addFocusListener(new FocusAdapter() {
+            public void focusLost(FocusEvent event)
+            {
+                if (!place_field.getText().equals(edit_text))
+                    saveDetail();
+            }
+        });
+        place_button = new Button(place_row, SWT.PUSH);
+        place_button.setText(Resource.getString("place_select"));
+        Moira.addFocusListener(place_button);
+        place_button.addSelectionListener(new SelectionAdapter() {
+            public void widgetSelected(SelectionEvent event)
+            {
+                int index = entry_list.getSelectionIndex();
+                if (index < 0 || index >= num_row[type])
+                    return;
+                edit_text = place_field.getText();
+                LocationSpinner loc = Moira.getChart().getSpinner();
+                String country = loc.getCountryName();
+                String city = loc.getCityName();
+                String zone = loc.getZoneName();
+                DataEntry entry = row_data[type][index];
+                loc.setCountryName(entry.getCountry());
+                loc.setCityName(entry.getCity());
+                loc.setZoneName(entry.getZone());
+                (new LocationDialog(Moira.getShell())).open();
+                String new_country = loc.getCountryName();
+                String new_city = loc.getCityName();
+                String new_zone = loc.getZoneName();
+                entry.setCountry(new_country);
+                entry.setCity(new_city);
+                entry.setZone(new_zone);
+                place_field.setText(new_city + ", " + new_country);
+                zone_field.setText(new_zone);
+                need_save = true;
+                refreshList();
+                loc.setCountryName(country);
+                loc.setCityName(city);
+                loc.setZoneName(zone);
+            }
+        });
+        Label zone_label = new Label(detail_container, SWT.RIGHT);
+        zone_label.setText(Resource.getString("zone_label"));
+        GridData zl_data = new GridData();
+        zl_data.widthHint = 70;
+        zone_label.setLayoutData(zl_data);
+        zone_field = new Text(detail_container, SWT.BORDER);
+        zone_field.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        Moira.addFocusListener(zone_field);
+        zone_field.addFocusListener(new FocusAdapter() {
+            public void focusLost(FocusEvent event)
+            {
+                int index = entry_list.getSelectionIndex();
+                if (index >= 0 && index < num_row[type]) {
+                    row_data[type][index].setZone(zone_field.getText());
+                    need_save = true;
+                }
+            }
+        });
+        mountain_label = new Label(detail_container, SWT.RIGHT);
+        mountain_label.setText(Resource.getString("mountain_label"));
+        GridData ml_data = new GridData();
+        ml_data.widthHint = 70;
+        mountain_label.setLayoutData(ml_data);
+        mountain_field = new Text(detail_container, SWT.BORDER);
+        mountain_field.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        Moira.addFocusListener(mountain_field);
+        mountain_field.addFocusListener(new FocusAdapter() {
+            public void focusLost(FocusEvent event)
+            {
+                saveDetail();
+            }
+        });
+        dayset_label = new Label(detail_container, SWT.RIGHT);
+        dayset_label.setText(Resource.getString("dayset_label"));
+        GridData dl_data = new GridData();
+        dl_data.widthHint = 70;
+        dayset_label.setLayoutData(dl_data);
+        dayset_combo = new Combo(detail_container, SWT.DROP_DOWN
+                | SWT.READ_ONLY);
+        dayset_combo.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        dayset_combo.add(Resource.getString("day_choice"));
+        dayset_combo.add(Resource.getString("night_choice"));
+        Moira.addFocusListener(dayset_combo);
+        dayset_combo.addSelectionListener(new SelectionAdapter() {
+            public void widgetSelected(SelectionEvent event)
+            {
+                saveDetail();
+            }
+        });
+        update_check = new Button(detail_container, SWT.CHECK);
+        update_check.setText(Resource.getString("update_check"));
+        GridData check_data = new GridData(GridData.FILL_HORIZONTAL);
+        check_data.horizontalSpan = 2;
+        update_check.setLayoutData(check_data);
+        Moira.addFocusListener(update_check);
+        update_check.addSelectionListener(new SelectionAdapter() {
+            public void widgetSelected(SelectionEvent event)
+            {
+                int index = entry_list.getSelectionIndex();
+                if (index < 0 || index >= num_row[type])
+                    return;
+                row_data[type][index].setSelected(update_check
+                        .getSelection());
+                need_save = true;
+                refreshList();
+                entry_list.setSelection(index);
+            }
+        });
+        Label note_label = new Label(detail_container, SWT.RIGHT
+                | SWT.TOP);
+        note_label.setText(Resource.getString("note_label"));
+        GridData ntl_data = new GridData(GridData.VERTICAL_ALIGN_BEGINNING);
+        ntl_data.widthHint = 70;
+        note_label.setLayoutData(ntl_data);
+        note_field = new Text(detail_container, SWT.BORDER | SWT.MULTI
+                | SWT.V_SCROLL | SWT.WRAP);
+        GridData note_data = new GridData(GridData.FILL_BOTH);
+        note_data.heightHint = 80;
+        note_field.setLayoutData(note_data);
+        Moira.addFocusListener(note_field);
+        note_field.addFocusListener(new FocusAdapter() {
+            public void focusLost(FocusEvent event)
+            {
+                saveNote();
+            }
+        });
+        // 描述区(DataTab,展开时占满主区)
+        desc = new DataTab();
+        desc_container = desc.createDataPage(TabManager.getPlaceHolder(), "",
+                "table", false, true, false, false, true);
+
+        // 底部容器:仅容纳关系图控件(占星模式,平时高度为 0)
+        bottom_container = new Composite(container, SWT.NO_FOCUS);
+        bottom_container.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        bottom_container.setLayout(new GridLayout(1, false));
+        relationship = new Composite(TabManager.getPlaceHolder(), SWT.NONE);        relationship = new Composite(TabManager.getPlaceHolder(), SWT.NONE);
         relationship.setLayout(new GridLayout(2, false));
         chart_type = new Combo(relationship, SWT.DROP_DOWN | SWT.READ_ONLY);
         String[] relationship_name = Resource
@@ -603,93 +591,24 @@ class TableTab {
                 setMultiMode(index);
             }
         });
-        footer = new Text(bottom_container, SWT.CENTER | SWT.BORDER);
-        footer.setLayoutData(new GridData(GridData.FILL_HORIZONTAL
-                | GridData.VERTICAL_ALIGN_CENTER | GridData.GRAB_VERTICAL));
-        footer.addFocusListener(new FocusAdapter() {
-            public void focusGained(FocusEvent focusEvent)
-            {
-                showDesc(true);
-            }
-        });
-        show = new Button(bottom_container, SWT.ARROW | SWT.UP);
-        show.setLayoutData(new GridData(GridData.FILL_VERTICAL));
-        show.setToolTipText(Resource.getString("tip_show_button"));
-        Moira.addFocusListener(show);
-        show.addSelectionListener(new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event)
-            {
-                showDesc(true);
-            }
-        });
-        hide = new Button(TabManager.getPlaceHolder(), SWT.ARROW | SWT.DOWN);
-        hide.setLayoutData(new GridData(GridData.FILL_VERTICAL));
-        hide.setToolTipText(Resource.getString("tip_hide_button"));
-        Moira.addFocusListener(hide);
-        hide.addSelectionListener(new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event)
-            {
-                showDesc(false);
-            }
-        });
-        label = new Text(bottom_container, SWT.RIGHT);
-        label.setLayoutData(new GridData(GridData.VERTICAL_ALIGN_CENTER
-                | GridData.GRAB_VERTICAL));
-        label.setEditable(false);
         setFont();
         name_up = place_up = birthday_up = need_save = false;
         has_both_set = true;
         update_depth = 0;
-        top_index = edit_row = edit_col = -1;
+        top_index = -1;
         male = Resource.getString("male");
         female = Resource.getString("female");
         day_choice = Resource.getString("day_choice");
         night_choice = Resource.getString("night_choice");
         if (ChartMode.isChartMode(ChartMode.ASTRO_MODE))
             addChartButton();
+        syncPickFields();
         resetSearch();
+        list_area.setWeights(new int[] { 42, 58 });
         update();
         return table_container;
     }
 
-    private void setEditField(int inc)
-    {
-        if (edit_row < 0 || edit_col < 0)
-            return;
-        TableItem item = table.getItem(edit_row);
-        if (inc != 0) {
-            edit_col += inc;
-            if (edit_col >= note_index)
-                edit_col = NAME;
-            else if (edit_col < NAME)
-                edit_col = note_index - 1;
-            Rectangle rect = item.getBounds(edit_col);
-            Display.getCurrent().setCursorLocation(
-                    table.toDisplay(rect.x + rect.width / 2, rect.y
-                            + rect.height / 2));
-        }
-        label_field.setVisible(false);
-        edit_text = item.getText(edit_col);
-        Color color = item.getBackground();
-        Text field;
-        if (edit_col == place_index) {
-            field = place_field;
-            place_container.setBackground(color);
-            place_field.setBackground(color);
-            place_button.setBackground(color);
-            field_editor.setEditor(place_container, item, edit_col);
-            place_container.setVisible(true);
-        } else {
-            field = text_field;
-            field_editor.setEditor(text_field, item, edit_col);
-            text_field.setVisible(true);
-        }
-        field.setText(edit_text);
-        field.setEditable(true);
-        field.selectAll();
-        field.setBackground(color);
-        field.setFocus();
-    }
 
     public boolean setMultiMode(int index)
     {
@@ -736,7 +655,7 @@ class TableTab {
 
     public boolean isDescShown()
     {
-        return show.getParent() == TabManager.getPlaceHolder();
+        return false;
     }
 
     public DataTab getDesc()
@@ -744,50 +663,15 @@ class TableTab {
         return desc;
     }
 
-    private void showDesc(boolean set)
-    {
-        if (set) {
-            if (show.getParent() == TabManager.getPlaceHolder()) {
-                Moira.setFocus(desc_container);
-                return;
-            }
-            show.setParent(TabManager.getPlaceHolder());
-            table.setParent(TabManager.getPlaceHolder());
-            hide.setParent(bottom_container);
-            desc_container.setParent(container);
-            desc_container.setLayoutData(new GridData(GridData.FILL_HORIZONTAL
-                    | GridData.FILL_VERTICAL));
-            hide.moveAbove(label);
-            desc_container.moveAbove(bottom_container);
-        } else {
-            if (hide.getParent() == TabManager.getPlaceHolder())
-                return;
-            hide.setParent(TabManager.getPlaceHolder());
-            desc_container.setParent(TabManager.getPlaceHolder());
-            show.setParent(bottom_container);
-            table.setParent(container);
-            show.moveAbove(label);
-            table.moveAbove(bottom_container);
-        }
-        String str = desc.getTextOnly().trim();
-        footer.setText(DataEntry.getOneLineDesc(str, SHORT_DESC_LENGTH, true));
-        bottom_container.layout();
-        container.layout();
-        bottom_container.update();
-        container.update();
-    }
-
     public boolean findTableNextEntry(String key, boolean forward)
     {
-        hideField();
-        showDesc(false);
-        hiliteEntry(false);
         if (num_row[type] <= 0)
             return false;
         if (find_row < 0) {
-            find_row = table.getTopIndex();
+            find_row = entry_list.getSelectionIndex();
+            if (find_row < 0)
+                find_row = 0;
             if (!forward) {
-                find_row += num_visible_row - 1;
                 find_row = Math.min(find_row, num_row[type] - 1);
             }
         } else {
@@ -801,7 +685,7 @@ class TableTab {
                 int index = matchEntry(row_data[type][i], key);
                 if (index >= 0) {
                     find_row = i;
-                    hiliteEntry(true);
+                    showEntry(find_row, false);
                     return true;
                 }
             }
@@ -809,7 +693,7 @@ class TableTab {
                 int index = matchEntry(row_data[type][i], key);
                 if (index >= 0) {
                     find_row = i;
-                    hiliteEntry(true);
+                    showEntry(find_row, false);
                     return true;
                 }
             }
@@ -818,7 +702,7 @@ class TableTab {
                 int index = matchEntry(row_data[type][i], key);
                 if (index >= 0) {
                     find_row = i;
-                    hiliteEntry(true);
+                    showEntry(find_row, false);
                     return true;
                 }
             }
@@ -826,7 +710,7 @@ class TableTab {
                 int index = matchEntry(row_data[type][i], key);
                 if (index >= 0) {
                     find_row = i;
-                    hiliteEntry(true);
+                    showEntry(find_row, false);
                     return true;
                 }
             }
@@ -837,54 +721,16 @@ class TableTab {
 
     public void resetSearch()
     {
-        if (num_row != null)
-            hiliteEntry(false);
         find_row = -1;
-    }
-
-    private void hiliteEntry(boolean hilite)
-    {
-        if (find_row < 0 || find_row >= num_row[type])
-            return;
-        if (hilite) {
-            showEntry(find_row, true);
-            TableItem item = table.getItem(find_row);
-            item.setBackground(hilite_bg_color);
-        } else {
-            TableItem item = table.getItem(find_row);
-            item.setBackground(((find_row % 2) == 1) ? odd_row_bg_color
-                    : bg_color);
-        }
-        setButtonEditors(false);
     }
 
     private void showEntry(int index, boolean update)
     {
-        int s = table.getTopIndex();
-        int e = Math.min(num_row[type], s + num_visible_row);
-        if (index < s || index >= e - 2) {
-            table.setRedraw(false);
-            table.setSelection(index);
-            table.showSelection();
-            table.deselectAll();
-            table.setRedraw(true);
-            if (update)
-                update();
-        }
-    }
-
-    private int getNumVisibleRow()
-    {
-        // GTK4/Wayland 下 getClientArea 会触发 forceResize,与 resize 事件
-        // 形成反馈环,这里改用 getSize 估算(无滚动条,仅差边框高度)
-        int height = table.getSize().y - table.getHeaderHeight();
-        if (height <= 0)
-            return 0;
-        int item_height = table.getItemHeight();
-        int n_row = height / item_height;
-        if (n_row * item_height < height)
-            n_row++;
-        return n_row;
+        entry_list.setSelection(index);
+        entry_list.showSelection();
+        showDetail(index);
+        if (update)
+            update();
     }
 
     private int matchEntry(DataEntry entry, String key)
@@ -916,7 +762,7 @@ class TableTab {
     {
         if (!initFieldIndex(true))
             return;
-        setColumn();
+        syncPickFields();
         int index = getSelectedIndex();
         if (num_row[type] > 0 && index < 0)
             index = 0;
@@ -940,7 +786,6 @@ class TableTab {
         if (relationship.getParent() == bottom_container)
             return;
         relationship.setParent(bottom_container);
-        relationship.moveAbove(footer);
         GridLayout layout = (GridLayout) bottom_container.getLayout();
         layout.numColumns++;
         bottom_container.layout();
@@ -956,21 +801,6 @@ class TableTab {
         layout.numColumns--;
         bottom_container.layout();
         bottom_container.update();
-    }
-
-    private void hideField()
-    {
-        place_container.setVisible(false);
-        text_field.setVisible(false);
-        label_field.setVisible(false);
-    }
-
-    private boolean inPlaceContainer()
-    {
-        Point pt = Display.getCurrent().getCursorLocation();
-        pt = place_container.toControl(pt);
-        Rectangle rect = place_container.getClientArea();
-        return rect.contains(pt);
     }
 
     private boolean initFieldIndex(boolean check)
@@ -993,62 +823,6 @@ class TableTab {
         return true;
     }
 
-    private void setColumn()
-    {
-        if (column != null) {
-            clearRows(
-                    0,
-                    num_row[ChartMode.isChartMode(ChartMode.PICK_MODE) ? DataSet.DATA
-                            : DataSet.PICK], false);
-            for (int i = 0; i < column.length; i++)
-                column[i].dispose();
-        }
-        column = new TableColumn[column_label[type].length];
-        for (int i = 0; i < column.length; i++) {
-            column[i] = new TableColumn(table,
-                    (column_align[type][i] != 0) ? SWT.CENTER : SWT.LEFT);
-        }
-        column[CHECK].setWidth(CHECK_WIDTH);
-        column[SELECT].setWidth(SELECT_WIDTH);
-        column[CHECK].setResizable(false);
-        column[SELECT].setResizable(false);
-        for (int i = column.length - 1; i >= 0; i--) {
-            column[i].setText(column_label[type][i].replaceAll("x", ""));
-            table.showColumn(column[i]);
-        }
-        column[CHECK].addSelectionListener(new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event)
-            {
-                toggleCheck();
-            }
-        });
-        column[SELECT].addSelectionListener(new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event)
-            {
-                flipRow();
-            }
-        });
-        column[NAME].addSelectionListener(new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event)
-            {
-                sortName();
-            }
-        });
-        column[place_index].addSelectionListener(new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event)
-            {
-                sortPlace();
-            }
-        });
-        column[date_index].addSelectionListener(new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event)
-            {
-                sortDay();
-            }
-        });
-        refresh(false);
-    }
-
     public int openFile(boolean multi, boolean clear, boolean check_mode,
             String file)
     {
@@ -1066,7 +840,6 @@ class TableTab {
             path = Moira.getIO().getFilePath();
         }
         if (files != null) {
-            table.setRedraw(false);
             if (clear)
                 clearTable(false);
             int[] index = loadData(path, files, clear);
@@ -1095,7 +868,6 @@ class TableTab {
                 has_both_set = num_row[DataSet.DATA] > 0
                         && num_row[DataSet.PICK] > 0;
             }
-            table.setRedraw(true);
             top_index = index[ChartMode.isChartMode(ChartMode.PICK_MODE) ? DataSet.PICK
                     : DataSet.DATA];
             need_save = false;
@@ -1125,8 +897,6 @@ class TableTab {
             if (str != null) {
                 desc.setText(str);
                 desc.resetUndo();
-                footer.setText(DataEntry.getOneLineDesc(str, SHORT_DESC_LENGTH,
-                        true));
             }
             for (int iter = 0; iter < DataSet.MAX_TYPE; iter++) {
                 index[iter] = addEntry(data_set, iter, false, true);
@@ -1155,7 +925,6 @@ class TableTab {
         }
         desc.setText("");
         desc.resetUndo();
-        footer.setText("");
         if (update)
             update();
     }
@@ -1191,7 +960,6 @@ class TableTab {
         int index = addEntry(data_set, type, true, update);
         if (index >= 0) {
             selected_data[type] = row_data[type][index];
-            row[index].setData();
         }
         update();
         top_index = index;
@@ -1208,9 +976,6 @@ class TableTab {
             return;
         need_save = true;
         selected_data[type].setNote(str);
-        int index = getSelectedIndex();
-        if (index >= 0)
-            row[index].setData();
         update();
     }
 
@@ -1337,21 +1102,25 @@ class TableTab {
     {
         if (num_row[type] == 0)
             return;
-        hiliteEntry(false);
         int count = 0;
         for (int i = 0; i < num_row[type]; i++) {
             if (row_data[type][i].getSelected())
                 count++;
         }
         if (count == 0) {
-            if (warn)
-                Message.info(Resource.getString("dialog_no_selection"));
-            return;
+            // 未勾选任何命例时,删除列表当前选中的那一行
+            int index = entry_list.getSelectionIndex();
+            if (index < 0 || index >= num_row[type]) {
+                if (warn)
+                    Message.info(Resource.getString("dialog_no_selection"));
+                return;
+            }
+            row_data[type][index].setSelected(true);
+            count = 1;
         }
-        if (!warn
-                || count < REMOVE_WARN
-                || Message.question(Resource
-                        .getString("dialog_remove_selection"))) {
+        // 删除一律弹确认对话框
+        if (!warn || Message.question(Resource
+                .getString("dialog_remove_selection"))) {
             for (int i = 0; i < num_row[type]; i++) {
                 if (row_data[type][i].getSelected()) {
                     if (selected_data[type] == row_data[type][i])
@@ -1392,14 +1161,12 @@ class TableTab {
                 row[i] = null;
             }
         }
-        table.remove(start, end - 1);
     }
 
     private void moveSelection(int iter, boolean up, boolean all, boolean warn)
     {
         if (num_row[iter] == 0)
             return;
-        hiliteEntry(false);
         int shift = up ? -1 : 1;
         int first = row_data[iter][0].getName().equals("") ? 1 : 0;
         int s = up ? first : (num_row[iter] - 1);
@@ -1420,21 +1187,6 @@ class TableTab {
             refresh(true);
         else if (warn)
             Message.info(Resource.getString("dialog_no_selection"));
-    }
-
-    private void flipRow()
-    {
-        if (num_row[type] < 2)
-            return;
-        hiliteEntry(false);
-        int mid = num_row[type] / 2;
-        for (int i = 0; i < mid; i++) {
-            int j = num_row[type] - i - 1;
-            DataEntry entry = row_data[type][i];
-            row_data[type][i] = row_data[type][j];
-            row_data[type][j] = entry;
-        }
-        refresh(true);
     }
 
     public int getNumEntry()
@@ -1467,21 +1219,6 @@ class TableTab {
         int index = getSelectedIndex();
         if (index >= 0)
             selected_data[type] = null;
-    }
-
-    private void toggleCheck()
-    {
-        if (num_row[type] == 0)
-            return;
-        int count = 0;
-        for (int i = 0; i < num_row[type]; i++) {
-            if (row_data[type][i].getSelected())
-                count++;
-        }
-        boolean mark = 2 * count < num_row[type];
-        for (int i = 0; i < num_row[type]; i++)
-            row_data[type][i].setSelected(mark);
-        setButtonEditors(false);
     }
 
     private void sortName()
@@ -1552,12 +1289,8 @@ class TableTab {
         for (int i = 0; i < num_row[type]; i++) {
             if (row[i] == null) {
                 row[i] = new Entry(row_data[type][i]);
-                row[i].setData();
-            } else {
-                if (row[i].entry != row_data[type][i]) {
-                    row[i].entry = row_data[type][i];
-                    row[i].setData();
-                }
+            } else if (row[i].entry != row_data[type][i]) {
+                row[i].entry = row_data[type][i];
             }
         }
         if (update)
@@ -1599,8 +1332,6 @@ class TableTab {
                     if (!DataEntry.nowFieldDifferOnly())
                         need_save = true;
                 }
-                if (iter == type)
-                    row[j].setData();
                 return j;
             }
         }
@@ -1610,7 +1341,6 @@ class TableTab {
             row_data[iter][0] = entry;
             if (iter == type) {
                 row[0].entry = entry;
-                row[0].setData();
             }
             return 0;
         }
@@ -1632,8 +1362,6 @@ class TableTab {
             row[num_row[iter]] = new Entry(entry);
         } else {
             row[num_row[iter]].entry = entry;
-            if (iter == type)
-                row[num_row[iter]].setData();
         }
         num_row[iter]++;
         if (first) {
@@ -1655,32 +1383,6 @@ class TableTab {
         return -1;
     }
 
-    private void setColumnSize()
-    {
-        if (update_depth != 0)
-            return;
-        update_depth++;
-        int[] width = new int[column.length];
-        width[CHECK] = CHECK_WIDTH;
-        width[SELECT] = SELECT_WIDTH;
-        for (int i = SELECT + 1; i < column.length; i++)
-            width[i] = textExtent(column_label[type][i]);
-        for (int i = 0; i < num_row[type]; i++) {
-            row[i].setMaxWidth(width);
-        }
-        int total_width = table.getClientArea().width;
-        for (int i = 0; i < column.length; i++) {
-            if (i != column.length - 1) {
-                total_width -= width[i];
-            } else {
-                width[i] = Math.max(total_width, width[i]);
-            }
-            if (column[i].getResizable() && column[i].getWidth() != width[i])
-                column[i].setWidth(width[i]);
-        }
-        update_depth--;
-    }
-
     public void updateChart(boolean update)
     {
         if (selected_data[type] == null)
@@ -1695,22 +1397,137 @@ class TableTab {
         }
     }
 
-    private int textExtent(String str)
+    // PICK 模式的座山/昼夜字段按模式显隐(exclude 释放格子)
+    private void syncPickFields()
     {
-        return gc.textExtent(str).x + TEXT_PADDING;
+        boolean pick = ChartMode.isChartMode(ChartMode.PICK_MODE);
+        setPickVisible(mountain_label, pick);
+        setPickVisible(mountain_field, pick);
+        setPickVisible(dayset_label, pick);
+        setPickVisible(dayset_combo, pick);
+        detail_container.layout();
+    }
+
+    private void setPickVisible(org.eclipse.swt.widgets.Control c,
+            boolean visible)
+    {
+        if (c == null || c.isDisposed())
+            return;
+        Object data = c.getLayoutData();
+        if (data instanceof GridData) {
+            ((GridData) data).exclude = !visible;
+            c.setVisible(visible);
+        }
     }
 
     public void update()
     {
-        table.setEnabled(false);
-        table.setItemCount(num_row[type]);
-        label.setText(Integer.toString(num_row[type]) + " "
+        label.setText(Resource.getString("entry_count_prefix")
+                + Integer.toString(num_row[type]) + " "
                 + Resource.getString("row_count"));
-        bottom_container.layout();
-        container.layout();
-        bottom_container.update();
-        container.update();
+        refreshList();
+        bottom_container.redraw();
         container.redraw();
+    }
+
+    // 重建列表行文本(◉/○ 当前命例,☑/☐ 参与批量更新)
+    private void refreshList()
+    {
+        if (entry_list == null || entry_list.isDisposed())
+            return;
+        entry_list.setRedraw(false);
+        entry_list.removeAll();
+        for (int i = 0; i < num_row[type]; i++) {
+            DataEntry entry = row_data[type][i];
+            if (entry == null)
+                continue;
+            entry_list.add(getListText(i));
+        }
+        entry_list.setRedraw(true);
+    }
+
+    private String getListText(int index)
+    {
+        DataEntry entry = row_data[type][index];
+        boolean cur = selected_data[type] == entry;
+        String name = entry.getName();
+        if (name == null || name.equals(""))
+            name = " ";
+        StringBuilder sb = new StringBuilder();
+        sb.append(cur ? "\u25C9 " : "  ");
+        sb.append(name);
+        for (int pad = name.length(); pad < 4; pad++)
+            sb.append(" ");
+        sb.append("  ");
+        sb.append(entry.getSex() ? male : female).append("  ");
+        sb.append(BaseCalendar.formatDate(entry.getBirthDay(), false, false));
+        if (ChartMode.isChartMode(ChartMode.PICK_MODE)) {
+            sb.append("  ").append(entry.getMountainPos()).append("  ");
+            sb.append(entry.getChoice() ? day_choice : night_choice);
+        }
+        // 勾选标记放行尾,与行首的当前命例指示分离
+        sb.append("  ").append(entry.getSelected() ? "\u2611" : " ");
+        return sb.toString();
+    }
+
+    // 列表单击:选中命例并填充详情;排盘延迟执行(留在管理页,
+    // 切回星盘页时才重排,避免与原版一样立刻跳走)
+    private void selectListEntry()
+    {
+        int index = entry_list.getSelectionIndex();
+        if (index < 0 || index >= num_row[type])
+            return;
+        selected_data[type] = row_data[type][index];
+        showDetail(index);
+        updateData(selected_data[type], true);
+    }
+
+    // 详情表单填充
+    private void showDetail(int index)
+    {
+        if (index < 0 || index >= num_row[type])
+            return;
+        last_selected_index = index;
+        DataEntry entry = row_data[type][index];
+        String title = entry.getName();
+        detail_title.setText((title == null || title.equals(""))
+                ? Resource.getString("detail_title") : title
+                        + " " + Resource.getString("detail_title_suffix"));
+        name_field.setText(entry.getName() == null ? "" : entry.getName());
+        sex_combo.select(entry.getSex() ? 0 : 1);
+        birthday_field.setText(BaseCalendar.formatDate(entry.getBirthDay(),
+                false, false));
+        place_field.setText(entry.getCity() + ", " + entry.getCountry());
+        zone_field.setText(entry.getZone() == null ? "" : entry.getZone());
+        note_field.setText(entry.getNote(true) == null ? "" : entry
+                .getNote(true));
+        update_check.setSelection(entry.getSelected());
+        if (ChartMode.isChartMode(ChartMode.PICK_MODE)) {
+            mountain_field.setText(entry.getMountainPos());
+            dayset_combo.select(entry.getChoice() ? 0 : 1);
+        }
+    }
+
+    // 表单失焦保存:audit 校验后写回命例
+    private void saveDetail()
+    {
+        int index = entry_list.getSelectionIndex();
+        if (index < 0 || index >= num_row[type])
+            return;
+        row[index].updateEntry();
+        need_save = true;
+        refreshList();
+        entry_list.setSelection(index);
+        showDetail(index);
+    }
+
+    private void saveNote()
+    {
+        int index = entry_list.getSelectionIndex();
+        if (index < 0 || index >= num_row[type])
+            return;
+        row_data[type][index].setNote(note_field.getText());
+        need_save = true;
     }
 
     public void setGroupName()
@@ -1735,134 +1552,20 @@ class TableTab {
         }
     }
 
-    private void setButtonEditors(boolean check)
+    public void dispose()
     {
-        num_visible_row = getNumVisibleRow();
-        if (check_editor != null && check_editor.length >= num_visible_row) {
-            if (check) {
-                for (int i = num_visible_row; i < check_editor.length; i++)
-                    setButtonEditorItem(i, null, null);
-            }
-        } else {
-            if (check_editor != null) {
-                for (int i = 0; i < check_editor.length; i++) {
-                    disposeButtonField(check_editor[i]);
-                    disposeButtonField(select_editor[i]);
-                }
-            }
-            check_editor = new TableEditor[num_visible_row];
-            select_editor = new TableEditor[num_visible_row];
-            for (int i = 0; i < num_visible_row; i++) {
-                check_editor[i] = addButtonField(SWT.CHECK, CHECK);
-                select_editor[i] = addButtonField(SWT.RADIO, SELECT);
-                getButton(check_editor[i]).addSelectionListener(
-                        new SelectionAdapter() {
-                            public void widgetSelected(SelectionEvent event)
-                            {
-                                Button b = (Button) event.getSource();
-                                for (int k = 0; k < num_visible_row; k++) {
-                                    if (b == getButton(check_editor[k])) {
-                                        int index = k + table.getTopIndex();
-                                        if (index >= num_row[type])
-                                            return;
-                                        row_data[type][index].setSelected(b
-                                                .getSelection());
-                                        return;
-                                    }
-                                }
-                            }
-                        });
-                getButton(select_editor[i]).addSelectionListener(
-                        new SelectionAdapter() {
-                            public void widgetSelected(SelectionEvent event)
-                            {
-                                Button b = (Button) event.getSource();
-                                if (!b.getSelection())
-                                    return;
-                                for (int k = 0; k < num_visible_row; k++) {
-                                    if (b == getButton(select_editor[k])) {
-                                        int index = k + table.getTopIndex();
-                                        if (index >= num_row[type])
-                                            return;
-                                        Entry r_entry = row[index];
-                                        selected_data[type] = r_entry.entry;
-                                        r_entry.updateEntry();
-                                        updateData(r_entry.entry, false);
-                                        Moira.getMenu()
-                                                .setExampleSelectedIndex(
-                                                        getSelectedIndex());
-                                        return;
-                                    }
-                                }
-                            }
-                        });
-            }
-        }
-        int top = table.getTopIndex();
-        for (int i = 0; i < num_visible_row; i++) {
-            int index = top + i;
-            if (index >= num_row[type]) {
-                setButtonEditorItem(i, null, null);
-            } else {
-                TableItem item = table.getItem(index);
-                setButtonEditorItem(i, item, row_data[type][index]);
-            }
-        }
+        if (font != null)
+            font.dispose();
     }
 
-    private void setButtonEditorItem(int index, TableItem item, DataEntry entry)
-    {
-        Button check = getButton(check_editor[index]);
-        Button select = getButton(select_editor[index]);
-        check_editor[index].setEditor(check, item, CHECK);
-        select_editor[index].setEditor(select, item, SELECT);
-        boolean visible = item != null;
-        if (visible) {
-            Color color = item.getBackground();
-            if (check.getBackground() != color) {
-                check.setBackground(color);
-                select.setBackground(color);
-            }
-            if (entry != null) {
-                if (check.getSelection() != entry.getSelected())
-                    check.setSelection(entry.getSelected());
-                boolean selected = selected_data[type] == entry;
-                if (select.getSelection() != selected)
-                    select.setSelection(selected);
-            }
-        }
-        if (check.getVisible() != visible) {
-            check.setVisible(visible);
-            select.setVisible(visible);
-        }
-    }
-
-    private TableEditor addButtonField(int style, int pos)
-    {
-        Button button = new Button(table, style);
-        TableEditor editor = new TableEditor(table);
-        editor.grabHorizontal = true;
-        editor.horizontalAlignment = SWT.LEFT;
-        editor.setEditor(button, null, pos);
-        return editor;
-    }
-
-    private void disposeButtonField(TableEditor editor)
-    {
-        getButton(editor).dispose();
-        editor.dispose();
-    }
-
+    // 字体/配色入口(菜单调用);列表版由系统字体渲染,保留空实现
+    // 以兼容 MenuFolder 的调用
     public void updateFont()
     {
-        table.setRedraw(false);
-        hideField();
-        setFont();
-        setColumnSize();
-        table.update();
-        setButtonEditors(true);
-        table.setRedraw(true);
-        update();
+    }
+
+    public void setColor()
+    {
     }
 
     private void setFont()
@@ -1871,43 +1574,16 @@ class TableTab {
             font.dispose();
         font = new Font(Display.getCurrent(), "Dialog.bold",
                 Resource.getSwtDataFontSize(), MenuFolder.getSwtFontStyle());
-        gc.setFont(font);
-        table.setFont(font);
-        place_field.setFont(font);
-        text_field.setFont(font);
-        label_field.setFont(font);
-        setColor();
-    }
-
-    public void setColor()
-    {
-        Color fg_color = ColorManager.getColor("table_font_color");
-        bg_color = ColorManager.getColor("table_background_color");
-        if (fg_color != table.getForeground()) {
-            table.setForeground(fg_color);
-            place_field.setForeground(fg_color);
-            text_field.setForeground(fg_color);
-            label_field.setForeground(fg_color);
+        if (entry_list != null && !entry_list.isDisposed())
+            entry_list.setFont(font);
+        if (name_field != null && !name_field.isDisposed()) {
+            name_field.setFont(font);
+            birthday_field.setFont(font);
+            place_field.setFont(font);
+            zone_field.setFont(font);
+            note_field.setFont(font);
+            mountain_field.setFont(font);
         }
-        if (bg_color != table.getBackground()) {
-            table.setBackground(bg_color);
-            chart_type.setBackground(bg_color);
-            footer.setBackground(bg_color);
-        }
-        odd_row_bg_color = ColorManager.getColor("table_odd_row_bg_color");
-        hilite_bg_color = ColorManager.getColor("table_hilite_bg_color");
-        desc.updateAttribute(false);
-    }
-
-    public void dispose()
-    {
-        gc.dispose();
-        font.dispose();
-    }
-
-    static public Button getButton(TableEditor editor)
-    {
-        return (Button) editor.getEditor();
     }
 
     public boolean genPicture(String dir_name)
@@ -2062,8 +1738,6 @@ class TableTab {
     }
 
     private class Entry {
-        private TableItem item;
-
         private DataEntry entry;
 
         public Entry(DataEntry data)
@@ -2071,65 +1745,15 @@ class TableTab {
             entry = data;
         }
 
-        public void initEntry(TableItem cur_item, boolean odd)
-        {
-            item = cur_item;
-            if (odd)
-                item.setBackground(odd_row_bg_color);
-            setData();
-        }
-
-        public void setData()
-        {
-            if (item == null)
-                return;
-            item.setText(NAME, entry.getName());
-            item.setText(SEX, entry.getSex() ? male : female);
-            if (ChartMode.isChartMode(ChartMode.PICK_MODE)) {
-                item.setText(MOUNTAIN, entry.getMountainPos());
-                item.setText(DAYSET, entry.getChoice() ? day_choice
-                        : night_choice);
-            }
-            item.setText(place_index, entry.getCity() + ", "
-                    + entry.getCountry());
-            item.setText(date_index, BaseCalendar.formatDate(entry
-                    .getBirthDay(), false, false));
-            String str = DataEntry.getOneLineDesc(entry.getNote(true),
-                    SHORT_DESC_LENGTH, false);
-            if (str == null || str.trim().equals(""))
-                item.setText(note_index, "");
-            else
-                item.setText(note_index, str);
-        }
-
-        public void setMaxWidth(int[] width)
-        {
-            if (item == null)
-                return;
-            width[NAME] = Math.max(textExtent(item.getText(NAME)), width[NAME]);
-            if (ChartMode.isChartMode(ChartMode.PICK_MODE)) {
-                width[MOUNTAIN] = Math.max(textExtent(item.getText(MOUNTAIN)),
-                        width[MOUNTAIN]);
-                width[DAYSET] = Math.max(textExtent(item.getText(DAYSET)),
-                        width[DAYSET]);
-            }
-            width[SEX] = Math.max(textExtent(item.getText(SEX)), width[SEX]);
-            width[place_index] = Math.max(
-                    textExtent(item.getText(place_index)), width[place_index]);
-            width[date_index] = Math.max(textExtent(item.getText(date_index)),
-                    width[date_index]);
-        }
-
         public void updateEntry()
         {
             auditName();
-            String str = item.getText(NAME);
+            String str = name_field.getText();
             entry.setName(str.equals("") ? null : str);
-            auditSex();
-            entry.setSex(item.getText(SEX).equals(male));
+            entry.setSex(sex_combo.getSelectionIndex() == 0);
             entry.setBirthDay(auditDate());
             City city = auditPlace();
-            str = item.getText(place_index);
+            str = place_field.getText();
             int index = str.lastIndexOf(',');
             String country_name = str.substring(index + 1).trim();
             String city_name = str.substring(0, index).trim();
@@ -2145,58 +1769,38 @@ class TableTab {
             }
             if (ChartMode.isChartMode(ChartMode.PICK_MODE)) {
                 auditMountain();
-                entry.setMountainPos(item.getText(MOUNTAIN));
-                auditChoice();
-                entry.setChoice(item.getText(DAYSET).equals(day_choice));
+                entry.setMountainPos(mountain_field.getText());
+                entry.setChoice(dayset_combo.getSelectionIndex() == 0);
             }
         }
 
         private void auditName()
         {
-            String str = item.getText(NAME);
+            String str = name_field.getText();
             if (!str.trim().equals(str))
-                item.setText(NAME, str.trim());
-        }
-
-        private void auditSex()
-        {
-            String str = item.getText(SEX).trim().toLowerCase();
-            if (str.startsWith("f"))
-                item.setText(SEX, female);
-            else if (!str.equals(female))
-                item.setText(SEX, male);
-        }
-
-        private void auditChoice()
-        {
-            if (!ChartMode.isChartMode(ChartMode.PICK_MODE))
-                return;
-            String str = item.getText(DAYSET).trim().toLowerCase();
-            if (str.startsWith("s"))
-                item.setText(DAYSET, night_choice);
-            else if (!str.equals(night_choice))
-                item.setText(DAYSET, day_choice);
+                name_field.setText(str.trim());
         }
 
         private void auditMountain()
         {
             if (!ChartMode.isChartMode(ChartMode.PICK_MODE))
                 return;
-            String str = item.getText(MOUNTAIN).trim();
+            String str = mountain_field.getText().trim();
             str = City.formatMapPos(City.parseMapPos(str), true);
-            item.setText(MOUNTAIN, str);
+            mountain_field.setText(str);
         }
 
         private int[] auditDate()
         {
             int[] date = new int[5];
-            item.setText(DATE, BaseCalendar.auditDay(item.getText(DATE), date));
+            birthday_field.setText(BaseCalendar.auditDay(birthday_field
+                    .getText(), date));
             return date;
         }
 
         private City auditPlace()
         {
-            String str = item.getText(place_index);
+            String str = place_field.getText();
             StringTokenizer st = new StringTokenizer(str, ",");
             int n_tok = st.countTokens();
             if (n_tok >= 1) {
@@ -2217,7 +1821,7 @@ class TableTab {
                     }
                     if (city != null) {
                         if (iter > 0) {
-                            item.setText(place_index, City.formatLongLatitude(
+                            place_field.setText(City.formatLongLatitude(
                                     long_val, true, true, false)
                                     + ", "
                                     + City.formatLongLatitude(lat_val, false,
@@ -2225,7 +1829,7 @@ class TableTab {
                                     + ", "
                                     + city.getCountryName());
                         } else {
-                            item.setText(place_index, city.getCityName() + ", "
+                            place_field.setText(city.getCityName() + ", "
                                     + city.getCountryName());
                         }
                         return city;
@@ -2234,20 +1838,19 @@ class TableTab {
                     City city = City.matchCity(tok_1.trim(), tok_2.trim(),
                             false);
                     if (city != null) {
-                        item.setText(place_index, city.getCityName() + ", "
+                        place_field.setText(city.getCityName() + ", "
                                 + city.getCountryName());
                         return city;
                     }
                 }
             }
-            item.setText(place_index, City.getDefaultCity() + ", "
+            place_field.setText(City.getDefaultCity() + ", "
                     + City.getDefaultCountry());
             return null;
         }
 
         public void dispose()
         {
-            item = null;
         }
     }
 }
