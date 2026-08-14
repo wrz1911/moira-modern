@@ -2,7 +2,7 @@
 
 七政四余（果老星宗）排盘软件 **Moira** 的现代化升级版。
 
-- 需求:**JDK 21+** | 平台:Linux / macOS / Windows
+- 需求:**JDK 22+**(推荐 26;FFM 原生接口转正版本)| 平台:Linux / macOS / Windows
 - 来源:原工程(2004-2015,作者林国清)已丢失,本工程基于流传的 [moira_macOS](https://github.com/xdhuangsidi/moira_macOS) 升级,移植到**现代 GTK4 / SWT 技术栈**
 
 > ⚠️ **项目状态**:仍在持续完善中。当前放出代码**基本可用,但 bug 还不少**

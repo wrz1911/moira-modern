@@ -14,17 +14,17 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 安装 JDK 21
+      - name: 安装最新 JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '26'
 
       - name: 编译
         run: |
           CP="out:lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar:lib/org.eclipse.equinox.common_3.20.400.jar:lib/org.eclipse.core.commands_3.12.500.jar:lib/jfreesvg-3.4.4.jar:src"
           mkdir -p out
-          javac --enable-preview --release 21 -encoding UTF-8 -d out -cp "$CP" $(find src -name '*.java')
+          javac -encoding UTF-8 -d out -cp "$CP" $(find src -name '*.java')
 
       - name: 组装 AppDir
         run: |
@@ -46,7 +46,7 @@ jobs:
           BASE="$HERE/../lib/moira"
           cd "$BASE"
           export SWT_GTK4=1
-          exec "$HERE/../runtime/bin/java" --enable-preview --enable-native-access=ALL-UNNAMED \
+          exec "$HERE/../runtime/bin/java" --enable-native-access=ALL-UNNAMED \
               -cp "out:lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar:lib/org.eclipse.equinox.common_3.20.400.jar:lib/org.eclipse.core.commands_3.12.500.jar:lib/jfreesvg-3.4.4.jar:src" \
               org.athomeprojects.moira.Moira "$@"
           LAUNCH
