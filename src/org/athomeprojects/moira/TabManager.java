@@ -188,6 +188,8 @@ public class TabManager {
 		}
 		tab_folder[folder].layout(true, true);
 		tab_folder[folder].redraw();
+		// tab 结构变更会触发界面重布局,顺带恢复工具栏行的可见性与重绘
+		FolderToolBar.refreshVisibility();
 	}
 
 	static public CTabFolder initTabFolder(Composite parent, int height) {

@@ -94,6 +94,15 @@ GTK 版本由环境变量 `SWT_GTK4` 控制：swt.jar 3.135 同时内含 GTK3 / 
   失败仅打印并安全返回，不影响功能；实测正常操作全程无断言。
 - 建议 2026-09 SWT 4.41 正式版发布后升级 lib/swt.jar，届时上述上游遗留应已修复。
 
+## Linux 工具栏布局（2026-08-14）
+
+- SWT 3.135 GTK4 的 CTabFolder topRight 布局存在缺陷（内部 SwtFixed 被分配 -1 尺寸，
+  工具栏被布局到窗口外，表现为「点一下 tab 才出现」）；GTK3 亦有同类问题。
+- 修复方案：工具栏不再挂 CTabFolder 的 topRight，改为**窗口内独立一行**（菜单栏下方、
+  tab 栏上方，`Moira.java` 的 content/toolbar_row 布局）。
+- 同步去掉了 CoolBar 层（拖拽/换行/显示不全的根源）与「操作帮助」按钮，
+  4 组图标（文件/编辑/选项/查找）由 RowLayout 固定单行排列，不可拖动、始终完整显示。
+
 ## 运行调试截图
 
 ![Alt](https://raw.githubusercontent.com/xdhuangsidi/moira_macOS/master/screenshot.png)

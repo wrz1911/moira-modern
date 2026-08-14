@@ -38,10 +38,11 @@ import org.eclipse.swt.internal.gtk4.GTK4;
 // 原点的真实布局坐标。Wayland 客户端拿不到屏幕绝对坐标(GTK 4.18+ 亦已
 // 移除 gdk_surface_get_origin),而 SWT GTK4 的 toDisplay 返回的正是同一
 // surface 相对坐标系,两者可直接求差得定位 gap。X11 后端同样适用。
-final class Gtk4SurfacePos {
+public final class Gtk4SurfacePos {
 	private static final Linker LINKER = Linker.nativeLinker();
 	private static final MethodHandle GDK_POPUP_GET_POSITION_X;
 	private static final MethodHandle GDK_POPUP_GET_POSITION_Y;
+
 
 	static {
 		SymbolLookup gtk = SymbolLookup.libraryLookup("libgtk-4.so.1",
@@ -84,7 +85,7 @@ final class Gtk4SurfacePos {
 	}
 
 
-	// 返回 popover 控件的真实分配尺寸 [w, h](GTK 布局后);失败返回 null
+		// 返回 popover 控件的真实分配尺寸 [w, h](GTK 布局后);失败返回 null
 	// 用于诊断 popover 是否被主窗口 client 区截断(文字被切)
 	static int[] size(long popoverHandle) {
 		int w = GTK4.gtk_widget_get_width(popoverHandle);

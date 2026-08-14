@@ -35,12 +35,13 @@ import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.CoolBar;
-import org.eclipse.swt.widgets.CoolItem;
+import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.layout.RowLayout;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
@@ -60,9 +61,8 @@ public class FolderToolBar {
 
     static private final int NUM_BAR_ORDER = 4;
 
-    static private CTabFolder parent_folder;
+    static private Composite parent_folder;
 
-    static private CoolBar folder_bar;
 
     static private CButton chart, horiz, aspects;
 
@@ -70,13 +70,13 @@ public class FolderToolBar {
 
     static private Composite[] containers = new Composite[NUM_BAR_ORDER];
 
-    static private CoolItem[] items = new CoolItem[NUM_BAR_ORDER];
 
     static private boolean[] visibles = new boolean[NUM_BAR_ORDER];
 
+
     static private LinkedList find_history = new LinkedList();
 
-    static private CButton open, save, save_as, help;
+    static private CButton open, save, save_as;
 
     static private Combo find_field;
 
@@ -86,29 +86,24 @@ public class FolderToolBar {
 
     static private boolean no_reset;
 
-    static public void init(CTabFolder folder)
+    static public void init(Composite parent)
     {
-        parent_folder = folder;
+        // Linux 下工具栏不再挂 CTabFolder 的 topRight(GTK4 布局腐坏
+        // 会把其移到窗口外),改为窗口内独立一行
+        parent_folder = parent;
         place_holder = TabManager.getPlaceHolder();
-        folder_container = new Composite(place_holder, SWT.NONE);
-        GridLayout layout = new GridLayout(2, false);
-        layout.marginHeight = layout.marginWidth = 0;
-        layout.horizontalSpacing = ICON_SPACING;
-        folder_container.setLayout(layout);
-        help = new CButton(folder_container, "help_icon", Resource
-                .getString("help_overview"));
-        help.setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_CENTER
-                | GridData.VERTICAL_ALIGN_CENTER));
-        help.addMouseListener(new MouseAdapter() {
-            public void mouseDown(MouseEvent event)
-            {
-                Moira.getMenu().doHelp();
-            }
-        });
-        folder_bar = new CoolBar(place_holder, SWT.NONE);
-        folder_bar.setBackground(folder_container.getBackground());
-        containers[FILE_BAR_ORDER] = new Composite(folder_bar, SWT.NONE);
-        layout = new GridLayout(6, false);
+        folder_container = new Composite(parent, SWT.NONE);
+        // 固定行:RowLayout 按内容自然宽度排列,无拖拽、不换行,
+        // 各组图标始终完整显示
+        RowLayout row_layout = new RowLayout(SWT.HORIZONTAL);
+        row_layout.marginHeight = row_layout.marginWidth = 0;
+        row_layout.spacing = ICON_SPACING;
+        row_layout.wrap = false;
+        row_layout.pack = false;
+        folder_container.setLayout(row_layout);
+        // 「操作帮助」按钮已按用户要求移除
+        containers[FILE_BAR_ORDER] = new Composite(folder_container, SWT.NONE);
+        GridLayout layout = new GridLayout(6, false);
         layout.marginHeight = layout.marginWidth = 0;
         layout.horizontalSpacing = ICON_SPACING;
         containers[FILE_BAR_ORDER].setLayout(layout);
@@ -172,7 +167,7 @@ public class FolderToolBar {
                 Moira.getMenu().doCapture();
             }
         });
-        containers[EDIT_BAR_ORDER] = new Composite(folder_bar, SWT.NONE);
+        containers[EDIT_BAR_ORDER] = new Composite(folder_container, SWT.NONE);
         layout = new GridLayout(6, false);
         layout.marginHeight = layout.marginWidth = 0;
         layout.horizontalSpacing = ICON_SPACING;
@@ -237,7 +232,7 @@ public class FolderToolBar {
                 Moira.getMenu().doRedo();
             }
         });
-        containers[PREF_BAR_ORDER] = new Composite(folder_bar, SWT.NONE);
+        containers[PREF_BAR_ORDER] = new Composite(folder_container, SWT.NONE);
         layout = new GridLayout(4, false);
         layout.marginHeight = layout.marginWidth = 0;
         layout.horizontalSpacing = ICON_SPACING;
@@ -284,7 +279,7 @@ public class FolderToolBar {
                 Moira.getMenu().doShowAspects(true);
             }
         });
-        containers[FIND_BAR_ORDER] = new Composite(folder_bar, SWT.NONE);
+        containers[FIND_BAR_ORDER] = new Composite(folder_container, SWT.NONE);
         layout = new GridLayout(3, false);
         layout.marginHeight = layout.marginWidth = 0;
         layout.horizontalSpacing = ICON_SPACING;
@@ -391,27 +386,17 @@ public class FolderToolBar {
 
     static public void updateFolderToolBar()
     {
-        if (folder_bar == null)
+        if (folder_container == null)
             return;
-        if (folder_container.getParent() == parent_folder) {
-            parent_folder.setTopRight(null);
-            folder_container.setParent(place_holder);
-        }
-        if (folder_bar.getParent() == folder_container)
-            folder_bar.setParent(place_holder);
         visibles[FILE_BAR_ORDER] = Resource.getPrefInt("show_file") != 0;
         visibles[EDIT_BAR_ORDER] = Resource.getPrefInt("show_edit") != 0;
         visibles[PREF_BAR_ORDER] = Resource.getPrefInt("show_pref") != 0;
         visibles[FIND_BAR_ORDER] = Resource.getPrefInt("show_find") != 0;
-        removeAllCoolItems();
-        boolean has_visible = false;
-        for (int i = 0; i < visibles.length; i++) {
-            if (visibles[i]) {
-                addCoolItem(i);
-                has_visible = true;
-            }
-        }
-        if (has_visible) {
+        for (int i = 0; i < visibles.length; i++)
+            containers[i].setVisible(visibles[i]);
+        if (visibles[FILE_BAR_ORDER] || visibles[EDIT_BAR_ORDER]
+                || visibles[PREF_BAR_ORDER]
+                || visibles[FIND_BAR_ORDER]) {
             if (visibles[FIND_BAR_ORDER]) {
                 if (!TabManager.tabOnTop(TabManager.TABLE_TAB_ORDER)) {
                     DataTab tab = Moira.getChart().getTopTab();
@@ -429,11 +414,8 @@ public class FolderToolBar {
                     findSelectAll();
                 }
             }
-            folder_bar.setParent(folder_container);
-            folder_bar.moveAbove(help);
         }
-        folder_container.setParent(parent_folder);
-        parent_folder.setTopRight(folder_container);
+        refreshVisibility();
         updateFolderBarState();
     }
 
@@ -444,30 +426,30 @@ public class FolderToolBar {
             find_field.setSelection(new Point(0, str.length()));
     }
 
-    static private void addCoolItem(int index)
-    {
-        containers[index].setParent(folder_bar);
-        items[index] = new CoolItem(folder_bar, SWT.NONE);
-        items[index].setControl(containers[index]);
-        containers[index].pack();
-        Point size = containers[index].getSize();
-        items[index].setPreferredSize(items[index].computeSize(size.x, size.y));
-    }
 
-    static private void removeAllCoolItems()
+
+                // Linux 下工具栏为窗口内独立一行,只须保持可见与自绘重绘
+    static public void refreshVisibility()
     {
-        for (int i = 0; i < NUM_BAR_ORDER; i++) {
-            if (items[i] != null) {
-                containers[i].setParent(place_holder);
-                items[i].dispose();
-                items[i] = null;
+        if (folder_container == null || parent_folder == null
+                || parent_folder.isDisposed())
+            return;
+        folder_container.setVisible(true);
+        for (int i = 0; i < containers.length; i++) {
+            if (containers[i] != null && !containers[i].isDisposed()) {
+                containers[i].setVisible(true);
+                containers[i].layout(true, true);
+                containers[i].redraw();
             }
         }
+        folder_container.layout(true, true);
+        folder_container.redraw();
+        parent_folder.layout(true, true);
     }
 
     static public void updateFolderBarState()
     {
-        if (folder_bar == null)
+        if (folder_container == null)
             return;
         boolean normal_mode = !ChartMode.isChartMode(ChartMode.PICK_MODE)
                 && !ChartMode.isChartMode(ChartMode.ASTRO_MODE);
@@ -511,16 +493,7 @@ public class FolderToolBar {
             Resource.putPrefInt("toolbar_version", TOOLBAR_VERSION);
             return;
         }
-        int[] orders = Resource.getPrefIntArray("toolbar_order");
-        int[] array = Resource.getPrefIntArray("toolbar_size");
-        int num_item = folder_bar.getItemCount();
-        if (num_item != array.length || num_item != orders.length)
-            return;
-        folder_bar.pack();
-        Point[] sizes = folder_bar.getItemSizes();
-        for (int i = 0; i < array.length; i++)
-            sizes[i].x = array[i];
-        folder_bar.setItemLayout(orders, null, sizes);
+        // 固定工具栏行:不再恢复拖拽顺序/尺寸
     }
 
     static public void saveSettings()
@@ -529,15 +502,7 @@ public class FolderToolBar {
             Resource.putPrefStringArray("find_history", (String[]) find_history
                     .toArray(new String[1]));
         }
-        if (folder_bar.getItemCount() > 0) {
-            Resource
-                    .putPrefIntArray("toolbar_order", folder_bar.getItemOrder());
-            Point[] sizes = folder_bar.getItemSizes();
-            int[] array = new int[sizes.length];
-            for (int i = 0; i < array.length; i++)
-                array[i] = sizes[i].x;
-            Resource.putPrefIntArray("toolbar_size", array);
-        }
+        // 固定工具栏行:不保存拖拽顺序/尺寸
     }
 
     static public void findNextEntry(boolean forward)
@@ -614,7 +579,7 @@ public class FolderToolBar {
 
     static public boolean isVisible()
     {
-        return folder_bar != null && folder_bar.getParent() == folder_container;
+        return folder_container != null && folder_container.getVisible();
     }
 
     static private boolean isEmptyString(String str)

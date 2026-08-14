@@ -77,6 +77,8 @@ public class Moira {
 
 	static private CTabFolder tab_folder;
 
+	static private Composite content, toolbar_row;
+
 	static private ChartTab chart_tab;
 
 	static private TableTab table_tab;
@@ -123,7 +125,19 @@ public class Moira {
 		setProgress(50);
 		table_tab = new TableTab();
 		menu_folder = new MenuFolder(parent);
-		tab_folder = TabManager.initTabFolder(parent, 22);
+		// Linux 下工具栏改为窗口内独立一行(GTK4 的 topRight 布局腐坏):
+		// content = toolbar_row + tab_folder 上下两行
+		content = new Composite(parent, SWT.NONE);
+		GridLayout content_layout = new GridLayout(1, false);
+		content_layout.marginWidth = content_layout.marginHeight = 0;
+		content.setLayout(content_layout);
+		toolbar_row = new Composite(content, SWT.NONE);
+		GridLayout toolbar_layout = new GridLayout(1, false);
+		toolbar_layout.marginWidth = toolbar_layout.marginHeight = 0;
+		toolbar_row.setLayout(toolbar_layout);
+		toolbar_row.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+		tab_folder = TabManager.initTabFolder(content, 22);
+		tab_folder.setLayoutData(new GridData(GridData.FILL_BOTH));
 		tab_folder.addMouseTrackListener(new MouseTrackAdapter() {
 			public void mouseEnter(MouseEvent event) {
 				chart_tab.hideUIInfo();
@@ -147,7 +161,7 @@ public class Moira {
 		}
 		showHideTable(isTableVisible(), true);
 		chart_tab.updateAdjNorth(null);
-		FolderToolBar.init(tab_folder);
+		FolderToolBar.init(toolbar_row);
 		tab_folder.setSelection(0);
 		setProgress(90);
 		if (Resource.trace) {
@@ -397,6 +411,13 @@ public class Moira {
 				// workaround for linux/gtk setBound and getBound mismatch bug
 				Rectangle before_bound = shell.getBounds();
 				shell.open();
+				// GTK 下自绘 CoolBar(右上角工具栏)在 shell 显示后可能仍未
+				// 绘制,实测「点一下才出现」;异步强制刷新一次
+				Display.getCurrent().asyncExec(new Runnable() {
+					public void run() {
+						FolderToolBar.refreshVisibility();
+					}
+				});
 				Rectangle after_bound = shell.getBounds();
 				if (!after_bound.equals(before_bound)) {
 					adjust_position = new Rectangle(before_bound.x
@@ -806,7 +827,7 @@ public class Moira {
 		display.asyncExec(new Runnable() {
 			public void run() {
 				new Moira(shell, install_path, file);
-				layout.topControl = tab_folder;
+				layout.topControl = content;
 				setShellTitle(null, null, false, false);
 				setShellPosition(null, null);
 				setShellState();
