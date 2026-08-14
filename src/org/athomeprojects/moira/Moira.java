@@ -823,8 +823,6 @@ public class Moira {
 		} else {
 			install_path = file = System.getProperty("user.dir");
 		}
-		System.out.println(System.getProperty("user.dir"));
-		
 		display = new Display();
 		shell = new Shell(display);
 		shell.setBackground(display.getSystemColor(SWT.COLOR_WHITE));

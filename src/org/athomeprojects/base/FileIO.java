@@ -603,10 +603,7 @@ public class FileIO {
 	}
 
 	private String getKey(String key) {
-		System.out.println("the  key  is    :" +key);
-		
 		String str = (String) table.get(key.toUpperCase());
-		System.out.println("the  key-str  is    :" +str);
 		if (str != null && str.length() > 0 && str.charAt(0) == '^')
 			return getKey(str.substring(1));
 		return (str == null) ? key.toUpperCase() : str;
