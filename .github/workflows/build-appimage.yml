@@ -1,0 +1,79 @@
+name: Build AppImage
+
+# 手动触发或推送 v* 标签时打包 Linux AppImage(自带精简 JRE)
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 编译
+        run: |
+          CP="out:lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar:lib/org.eclipse.equinox.common_3.20.400.jar:lib/org.eclipse.core.commands_3.12.500.jar:lib/jfreesvg-3.4.4.jar:src"
+          mkdir -p out
+          javac -encoding UTF-8 -d out -cp "$CP" $(find src -name '*.java')
+
+      - name: 组装 AppDir
+        run: |
+          APP=Moira
+          DIST=dist/AppDir
+          mkdir -p "$DIST/usr/bin" "$DIST/usr/share/applications"
+          # jlink 精简 JRE(SWT/AWT/prefs 所需模块)
+          jlink --add-modules java.base,java.desktop,java.prefs,java.logging \
+              --strip-debug --no-man-pages --no-header-files \
+              --output "$DIST/runtime"
+          mkdir -p "$DIST/usr/lib/moira"
+          cp -r out lib src "$DIST/usr/lib/moira/"
+          cp -r ephe example help icon moira_s.prop moira_t.prop cities.prop \
+              moira-gtk.css GPL_license.txt LGPL_license.txt SEPL_license.txt \
+              readme.html "$DIST/usr/lib/moira/"
+          cat > "$DIST/usr/bin/moira" << 'LAUNCH'
+          #!/usr/bin/env bash
+          HERE="$(dirname "$(readlink -f "$0")")"
+          BASE="$HERE/../lib/moira"
+          cd "$BASE"
+          export SWT_GTK4=1
+          exec "$HERE/../runtime/bin/java" --enable-native-access=ALL-UNNAMED \
+              -cp "out:lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar:lib/org.eclipse.equinox.common_3.20.400.jar:lib/org.eclipse.core.commands_3.12.500.jar:lib/jfreesvg-3.4.4.jar:src" \
+              org.athomeprojects.moira.Moira "$@"
+          LAUNCH
+          chmod +x "$DIST/usr/bin/moira"
+          cat > "$DIST/usr/share/applications/moira.desktop" << 'DESK'
+          [Desktop Entry]
+          Name=Moira
+          Comment=七政四余(果老星宗)排盘软件
+          Exec=moira
+          Icon=moira
+          Type=Application
+          Categories=Education;Science;
+          DESK
+          cp "$DIST/usr/share/applications/moira.desktop" "$DIST/moira.desktop"
+
+      - name: 打包 AppImage
+        run: |
+          TOOL=appimagetool-x86_64.AppImage
+          curl -sL -o "$TOOL" \
+              "https://github.com/AppImage/appimagetool/releases/download/continuous/$TOOL"
+          chmod +x "$TOOL"
+          VERSION=$(grep -o 'Version [0-9.]*' readme.html | head -1 | awk '{print $2}')
+          ARCH=x86_64 "./$TOOL" dist/AppDir \
+              "dist/Moira-${VERSION}-x86_64.AppImage"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: Moira-AppImage
+          path: dist/*.AppImage
