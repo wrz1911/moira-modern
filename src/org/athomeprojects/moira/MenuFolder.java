@@ -1923,6 +1923,9 @@ public class MenuFolder {
             capture_file = new File(path_name + File.separator + file_name
                     + "." + format);
         }
+        if (format.equals("svg"))
+            return ImageControl.captureSVG(capture_file, ImageControlDialog
+                    .getImageSize());
         BufferedImage image = ImageControl.captureImage(ImageControlDialog
                 .getImageSize());
         try {

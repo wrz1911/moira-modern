@@ -20,6 +20,11 @@ package org.athomeprojects.base;
 
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+
+import org.jfree.graphics2d.svg.SVGGraphics2D;
+import org.jfree.graphics2d.svg.SVGUtils;
 
 public class ImageControl {
 	static public final int SMALL_SIZE = 0;
@@ -32,7 +37,7 @@ public class ImageControl {
 
 	static public final int MIN_SIZE = 320;
 
-	static public String[] IMAGE_EXTENSIONS = { "*.png", "*.jpg" };
+	static public String[] IMAGE_EXTENSIONS = { "*.png", "*.jpg", "*.svg" };
 
 	static public int getSelectionFromSize(int[] size) {
 		if(true) return MEDIUM_SIZE;
@@ -134,5 +139,46 @@ public class ImageControl {
 				Resource.getPrefInt("image_vertical_text") != 0, false);
 		g2d.dispose();
 		return image;
+	}
+
+	// 与 captureImage 相同的绘制序列,但目标换成 JFreeSVG 的
+	// SVGGraphics2D,输出矢量 SVG 文件(可无损缩放、方便分享)。
+	// pageDiagram 只依赖 Graphics2D 接口,因此复用同一套绘制代码
+	static public boolean captureSVG(File svg_file, int[] image_desc) {
+		boolean chart_only = Resource.getPrefInt("image_chart_only") != 0;
+		int width = image_desc[0];
+		int height = image_desc[1];
+		int margin_x = image_desc[2];
+		int margin_y = image_desc[3];
+		if (chart_only) {
+			width = height = Math.min(width, height);
+			margin_x = margin_y = Math.min(margin_x, margin_y);
+		}
+		int image_width = width - 2 * margin_x;
+		int image_height = height - 2 * margin_y;
+		SVGGraphics2D svg = new SVGGraphics2D(width, height);
+		DrawAWT.setFillColor(svg, "chart_window_bg_color", false);
+		svg.fillRect(0, 0, width, height);
+		svg.translate(margin_x, margin_y);
+		int diag_width = Resource.DIAGRAM_WIDTH;
+		int scaler = Resource.getInt("print_scaler");
+		diag_width *= scaler;
+		double scale = (double) Math.min(image_width, image_height)
+				/ diag_width;
+		svg.scale(scale, scale);
+		int scaled_width = (int) (image_width / scale);
+		int scaled_height = (int) (image_height / scale);
+		ChartData.getData().pageDiagram(svg, "", scaler,
+				new java.awt.Point(scaled_width, scaled_height),
+				new java.awt.Point(diag_width, diag_width), false, true, false,
+				chart_only, true, false,
+				Resource.getPrefInt("image_vertical_text") != 0, false);
+		try {
+			SVGUtils.writeToSVG(svg_file, svg.getSVGElement());
+		} catch (IOException e) {
+			return false;
+		}
+		svg.dispose();
+		return true;
 	}
 }

@@ -5,7 +5,7 @@
 # 设环境变量 SWT_GTK4=1 强制先加载 GTK4(pi4),GTK4 加载失败自动回退 GTK3
 cd "$(dirname "$0")"
 
-CP="out:lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar:lib/org.eclipse.equinox.common_3.20.400.jar:lib/org.eclipse.core.commands_3.12.500.jar:src"
+CP="out:lib/swt.jar:lib/org.eclipse.jface_3.39.100.jar:lib/org.eclipse.equinox.common_3.20.400.jar:lib/org.eclipse.core.commands_3.12.500.jar:lib/jfreesvg-3.4.4.jar:src"
 
 # out 目录没有 class 时先编译
 if [ ! -d out ] || [ -z "$(find out -name '*.class' | head -1)" ]; then
