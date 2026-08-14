@@ -4470,6 +4470,17 @@ public class ChartData {
     private void computeData() throws ArithmeticException
     {
         cal.setChartMode();
+        // 计都定义(流派口径):默认真交点(清法);
+        // ketu_apogee=1 计都=月远地点(果老宋明古法,与月孛同度);
+        // use_mean_node=1 计都=平均交点(古法「行无徐疾」)
+        int node_body = SweConst.SE_TRUE_NODE;
+        if (Resource.hasPrefInt("ketu_apogee")
+                && Resource.getPrefInt("ketu_apogee") != 0)
+            node_body = SweConst.SE_MEAN_APOG;
+        else if (Resource.hasPrefInt("use_mean_node")
+                && Resource.getPrefInt("use_mean_node") != 0)
+            node_body = SweConst.SE_MEAN_NODE;
+        planets[TRUE_NODE] = node_body;
         show_gauquelin = ChartMode.isChartMode(ChartMode.ASTRO_MODE)
                 && show_gauquelin_set;
         show_aspects = ChartMode.isChartMode(ChartMode.ASTRO_MODE)

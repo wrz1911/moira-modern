@@ -519,6 +519,35 @@ public class MenuFolder {
                     doShowAspects(false);
                 }
             });
+            // 计都定义(流派口径):远地点(果老古法)/平均交点
+            final MenuItem ketu_apogee = new MenuItem(menu, SWT.CHECK);
+            ketu_apogee.setText(Resource.getString("pref_ketu_apogee"));
+            ketu_apogee.setSelection(Resource.hasPrefInt("ketu_apogee")
+                    && Resource.getPrefInt("ketu_apogee") != 0);
+            ketu_apogee.addSelectionListener(new SelectionAdapter() {
+                public void widgetSelected(SelectionEvent event)
+                {
+                    Resource.putPrefInt("ketu_apogee",
+                            ketu_apogee.getSelection() ? 1 : 0);
+                    if (ketu_apogee.getSelection())
+                        Resource.putPrefInt("use_mean_node", 0);
+                    Moira.update(false, true);
+                }
+            });
+            final MenuItem use_mean_node = new MenuItem(menu, SWT.CHECK);
+            use_mean_node.setText(Resource.getString("pref_use_mean_node"));
+            use_mean_node.setSelection(Resource.hasPrefInt("use_mean_node")
+                    && Resource.getPrefInt("use_mean_node") != 0);
+            use_mean_node.addSelectionListener(new SelectionAdapter() {
+                public void widgetSelected(SelectionEvent event)
+                {
+                    Resource.putPrefInt("use_mean_node",
+                            use_mean_node.getSelection() ? 1 : 0);
+                    if (use_mean_node.getSelection())
+                        Resource.putPrefInt("ketu_apogee", 0);
+                    Moira.update(false, true);
+                }
+            });
         }
         if (!ChartMode.isChartMode(ChartMode.ASTRO_MODE)) {
             final MenuItem explain_star = new MenuItem(menu, SWT.CHECK);
